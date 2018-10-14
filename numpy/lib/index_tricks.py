@@ -1007,6 +1007,19 @@ class ndrange(_nx.collections_abc.Sequence):
             arr[i] = value
         return arr
 
+    @property
+    def flat(self):
+        return iter(self)
+
+    def ravel(self, order='C'):
+        if order in 'CAK':
+            return iter(self)
+        elif order == 'F':
+            return (i[::-1] for i in itertools.product(*self._ranges[::-1]))
+        else:
+            raise ValueError('order must be one of "C", "F", "A", or "K"')
+
+
 
 @set_module('numpy')
 class ndindex(object):
