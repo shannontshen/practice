@@ -136,12 +136,12 @@ def linspace(start, stop, num=50, endpoint=True, retstep=False, dtype=None,
         # that it is at all possible to draw num equispaced
         # samples.
         if dtype is None:
-            raise ValueError("linspace with {} objects cannot be called with"
-                    "dtype=None".format(start.dtype))
-        if np.isnat(start):
-            raise ValueError("start is NaT, linspace won't work.")
-        if np.isnat(stop):
-            raise ValueError("stop is NaT, linspace won't work.")
+            raise ValueError("linspace() with {} objects requires the `dtype` argument "
+                    "to be set to the desired output dtype".format(start.dtype))
+        if _nx.isnat(start):
+            raise ValueError("linspace() cannot be called with start=NaT")
+        if _nx.isnat(stop):
+            raise ValueError("linspace() cannot be called with end=NaT")
         start = start.astype(dtype).view(_nx.int64)
         stop = stop.astype(dtype).view(_nx.int64)
     else:
