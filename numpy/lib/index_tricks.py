@@ -744,12 +744,12 @@ s_ = IndexExpression(maketuple=False)
 # applicable to N-dimensions.
 
 
-def _fill_diagonal_dispatcher(a, val, wrap=None):
+def _fill_diagonal_dispatcher(a, val, wrap=None, offset=None):
     return (a,)
 
 
 @array_function_dispatch(_fill_diagonal_dispatcher)
-def fill_diagonal(a, val, wrap=False):
+def fill_diagonal(a, val, wrap=False, offset=0):
     """Fill the main diagonal of the given array of any dimensionality.
 
     For an array `a` with ``a.ndim >= 2``, the diagonal is the list of
@@ -769,6 +769,9 @@ def fill_diagonal(a, val, wrap=False):
       For tall matrices in NumPy version up to 1.6.2, the
       diagonal "wrapped" after N columns. You can have this behavior
       with this option. This affects only tall matrices.
+
+    offset: int
+      Fills array along non-primary diagonal specified by offset.
 
     See also
     --------
@@ -863,12 +866,15 @@ def fill_diagonal(a, val, wrap=False):
         raise ValueError("array must be at least 2-d")
     end = None
     if a.ndim == 2:
+        if offset >= a.shape[1]:
+            raise ValueError("offset must be < width of array")
         # Explicit, fast formula for the common case.  For 2-d arrays, we
         # accept rectangular ones.
         step = a.shape[1] + 1
         #This is needed to don't have tall matrix have the diagonal wrap.
         if not wrap:
-            end = a.shape[1] * a.shape[1]
+            end = (a.shape[1] - offset) * a.shape[1]
+
     else:
         # For more than d=2, the strided formula is only valid for arrays with
         # all dimensions equal, so we check first.
@@ -877,7 +883,15 @@ def fill_diagonal(a, val, wrap=False):
         step = 1 + (cumprod(a.shape[:-1])).sum()
 
     # Write the value out into the diagonal.
-    a.flat[:end:step] = val
+    # if it's a 2D square array with wrap, manually fill in diagonals so
+    # rows aren't skipped between diagonals
+    flag = a.ndim == 2 and a.shape[0] == a.shape[1] and wrap
+    if flag:
+        for i in range(a.shape[0]):
+            a[i][(i+offset)%a.shape[0]] = val
+        
+    else:
+        a.flat[offset:end:step] = val
 
 
 @set_module('numpy')
