@@ -3446,7 +3446,7 @@ add_newdoc('numpy.core.umath', 'spacing',
 
     Examples
     --------
-    >>> np.spacing(1) == np.finfo(np.float64).eps
+    >>> np.spacing(np.float64(1)) == np.finfo(np.float64).eps
     True
 
     """)
