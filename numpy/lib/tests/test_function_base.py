@@ -1186,6 +1186,31 @@ class TestTrimZeros:
         res = trim_zeros(a)
         assert_array_equal(res, np.array([1, 0, 2, 3, 0, 4]))
 
+    @pytest.mark.parametrize("ndim", (0, 1, 2, 3, 10))
+    def test_nd_basic(self, ndim):
+        a = np.ones((2,) * ndim)
+        b = np.pad(a, (2, 1), mode="constant", constant_values=0)
+        res = trim_zeros(b, axis=None)
+        assert_array_equal(a, res)
+
+    @pytest.mark.parametrize("ndim", (0, 1, 2, 3))
+    def test_allzero(self, ndim):
+        a = np.zeros((3,) * ndim)
+        res = trim_zeros(a, axis=None)
+        assert_array_equal(res, np.zeros((0,) * ndim))
+
+    def test_trim_arg(self):
+        a = np.array([0, 1, 2, 0])
+
+        res = trim_zeros(a, trim='f')
+        assert_array_equal(res, [1, 2, 0])
+
+        res = trim_zeros(a, trim='b')
+        assert_array_equal(res, [0, 1, 2])
+
+        res = trim_zeros(a, trim='')
+        assert_array_equal(res, [0, 1, 2, 0])
+
 
 class TestExtins:
 
