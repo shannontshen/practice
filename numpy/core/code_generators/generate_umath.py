@@ -833,7 +833,8 @@ defdict = {
           docstrings.get('numpy.core.umath.remainder'),
           'PyUFunc_RemainderTypeResolver',
           TD(intflt),
-          [TypeDescription('m', FullTypeDescr, 'mm', 'm')],
+          [TypeDescription('m', FullTypeDescr, 'mq', 'm'),
+           TypeDescription('m', FullTypeDescr, 'mm', 'm')],
           TD(O, f='PyNumber_Remainder'),
           ),
 'divmod':
@@ -841,7 +842,8 @@ defdict = {
           docstrings.get('numpy.core.umath.divmod'),
           'PyUFunc_DivmodTypeResolver',
           TD(intflt),
-          [TypeDescription('m', FullTypeDescr, 'mm', 'qm')],
+          [TypeDescription('m', FullTypeDescr, 'mq', 'mm'),
+           TypeDescription('m', FullTypeDescr, 'mm', 'qm')],
           # TD(O, f='PyNumber_Divmod'),  # gh-9730
           ),
 'hypot':

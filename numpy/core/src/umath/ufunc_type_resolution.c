@@ -1171,11 +1171,6 @@ PyUFunc_DivisionTypeResolver(PyUFuncObject *ufunc,
                 return -1;
             }
             out_dtypes[1] = PyArray_DescrFromType(NPY_LONGLONG);
-            if (out_dtypes[1] == NULL) {
-                Py_DECREF(out_dtypes[0]);
-                out_dtypes[0] = NULL;
-                return -1;
-            }
             out_dtypes[2] = out_dtypes[0];
             Py_INCREF(out_dtypes[2]);
 
@@ -1188,11 +1183,6 @@ PyUFunc_DivisionTypeResolver(PyUFuncObject *ufunc,
                 return -1;
             }
             out_dtypes[1] = PyArray_DescrNewFromType(NPY_DOUBLE);
-            if (out_dtypes[1] == NULL) {
-                Py_DECREF(out_dtypes[0]);
-                out_dtypes[0] = NULL;
-                return -1;
-            }
             out_dtypes[2] = out_dtypes[0];
             Py_INCREF(out_dtypes[2]);
 
@@ -1246,6 +1236,16 @@ PyUFunc_RemainderTypeResolver(PyUFuncObject *ufunc,
             }
             out_dtypes[1] = out_dtypes[0];
             Py_INCREF(out_dtypes[1]);
+            out_dtypes[2] = out_dtypes[0];
+            Py_INCREF(out_dtypes[2]);
+        }
+        else if (PyTypeNum_ISINTEGER(type_num2)) {
+            out_dtypes[0] = ensure_dtype_nbo(PyArray_DESCR(operands[0]));
+            if (out_dtypes[0] == NULL) {
+                return -1;
+            }
+            Py_INCREF(out_dtypes[0]);
+            out_dtypes[1] = PyArray_DescrFromType(NPY_LONGLONG);
             out_dtypes[2] = out_dtypes[0];
             Py_INCREF(out_dtypes[2]);
         }
@@ -2213,6 +2213,23 @@ PyUFunc_DivmodTypeResolver(PyUFuncObject *ufunc,
             out_dtypes[1] = out_dtypes[0];
             Py_INCREF(out_dtypes[1]);
             out_dtypes[2] = PyArray_DescrFromType(NPY_LONGLONG);
+            out_dtypes[3] = out_dtypes[0];
+            Py_INCREF(out_dtypes[3]);
+        }
+        /* divmod(m8[<A>], int) => m8[<A>], m8[<A>] */
+        else if (PyTypeNum_ISINTEGER(type_num2)) {
+            out_dtypes[0] = ensure_dtype_nbo(PyArray_DESCR(operands[0]));
+            if (out_dtypes[0] == NULL) {
+                return -1;
+            }
+            out_dtypes[1] = PyArray_DescrFromType(NPY_LONGLONG);
+            if (out_dtypes[1] == NULL) {
+                Py_DECREF(out_dtypes[0]);
+                out_dtypes[0] = NULL;
+                return -1;
+            }
+            out_dtypes[2] = out_dtypes[0];
+            Py_INCREF(out_dtypes[2]);
             out_dtypes[3] = out_dtypes[0];
             Py_INCREF(out_dtypes[3]);
         }
