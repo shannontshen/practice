@@ -223,6 +223,13 @@ _find_array_method(PyObject *args, PyObject *method_name)
 static PyObject *
 _get_output_array_method(PyObject *obj, PyObject *method,
                          PyObject *input_method) {
+    if (obj == (PyObject *)&PyArray_Type) {
+        /*
+         * If the inputs do not wrap, np.ndarray indicates that no reduction
+         * to scalar is done: the output will be of np.ndarray type.
+         */
+        Py_RETURN_NONE;
+    }
     if (obj != Py_None) {
         PyObject *ometh;
 
@@ -818,8 +825,12 @@ fail:
 static int
 _set_out_array(PyObject *obj, PyArrayObject **store)
 {
-    if (obj == Py_None) {
-        /* Translate None to NULL */
+    if ((obj == Py_None) || (obj == (PyObject *)&PyArray_Type)) {
+        /*
+         * Translate None and np.ndarray to NULL. Both mean that we need to
+         * allocate the output array. np.ndarray will force ndarray output
+         * (no wrapping will be done, especially not to scalar!).
+         */
         return 0;
     }
     if (PyArray_Check(obj)) {
@@ -4449,6 +4460,7 @@ PyUFunc_GenericReduction(PyUFuncObject *ufunc, PyObject *args,
     PyObject *obj_ind;
     PyArrayObject *indices = NULL;
     PyArray_Descr *otype = NULL;
+    PyObject *out_obj = NULL;
     PyArrayObject *out = NULL;
     int keepdims = 0;
     PyObject *initial = NULL;
@@ -4483,32 +4495,16 @@ PyUFunc_GenericReduction(PyUFuncObject *ufunc, PyObject *args,
                      _reduce_type[operation]);
         return NULL;
     }
-    /* if there is a tuple of 1 for `out` in kwds, unpack it */
-    if (kwds != NULL) {
-        PyObject *out_obj = PyDict_GetItemWithError(kwds, npy_um_str_out);
-        if (out_obj == NULL && PyErr_Occurred()){
-            return NULL;
-        }
-        else if (out_obj != NULL && PyTuple_CheckExact(out_obj)) {
-            if (PyTuple_GET_SIZE(out_obj) != 1) {
-                PyErr_SetString(PyExc_ValueError,
-                                "The 'out' tuple must have exactly one entry");
-                return NULL;
-            }
-            out_obj = PyTuple_GET_ITEM(out_obj, 0);
-            PyDict_SetItem(kwds, npy_um_str_out, out_obj);
-        }
-    }
 
     if (operation == UFUNC_REDUCEAT) {
         PyArray_Descr *indtype;
         indtype = PyArray_DescrFromType(NPY_INTP);
-        if (!PyArg_ParseTupleAndKeywords(args, kwds, "OO|OO&O&:reduceat", reduceat_kwlist,
+        if (!PyArg_ParseTupleAndKeywords(args, kwds, "OO|OO&O:reduceat", reduceat_kwlist,
                                          &op,
                                          &obj_ind,
                                          &axes_in,
                                          PyArray_DescrConverter2, &otype,
-                                         PyArray_OutputConverter, &out)) {
+                                         &out_obj)) {
             goto fail;
         }
         indices = (PyArrayObject *)PyArray_FromAny(obj_ind, indtype,
@@ -4518,27 +4514,46 @@ PyUFunc_GenericReduction(PyUFuncObject *ufunc, PyObject *args,
         }
     }
     else if (operation == UFUNC_ACCUMULATE) {
-        if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|OO&O&:accumulate",
+        if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|OO&O:accumulate",
                                          accumulate_kwlist,
                                          &op,
                                          &axes_in,
                                          PyArray_DescrConverter2, &otype,
-                                         PyArray_OutputConverter, &out)) {
+                                         &out_obj)) {
             goto fail;
         }
     }
     else {
-        if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|OO&O&iOO&:reduce",
+        if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|OO&OiOO&:reduce",
                                          reduce_kwlist,
                                          &op,
                                          &axes_in,
                                          PyArray_DescrConverter2, &otype,
-                                         PyArray_OutputConverter, &out,
+                                         &out_obj,
                                          &keepdims, &initial,
                                          _wheremask_converter, &wheremask)) {
             goto fail;
         }
     }
+    /* Check for np.ndarray in out to mean no reduction to scalar */
+    if (out_obj == (PyObject *)&PyArray_Type) {
+        out = NULL;
+    }
+    else if (out_obj != NULL) {
+        /* if there is a tuple of 1 for `out` in kwds, unpack it */
+        if (PyTuple_CheckExact(out_obj)) {
+            if (PyTuple_GET_SIZE(out_obj) != 1) {
+                PyErr_SetString(PyExc_ValueError,
+                                "The 'out' tuple must have exactly one entry");
+                goto fail;
+            }
+            out_obj = PyTuple_GET_ITEM(out_obj, 0);
+        }
+        if (PyArray_OutputConverter(out_obj, &out) < 0) {
+            goto fail;
+        }
+    }
+
     /* Ensure input is an array */
     mp = (PyArrayObject *)PyArray_FromAny(op, NULL, 0, 0, 0, NULL);
     if (mp == NULL) {
@@ -4696,10 +4711,14 @@ PyUFunc_GenericReduction(PyUFuncObject *ufunc, PyObject *args,
         /* Find __array_wrap__ - note that these rules are different to the
          * normal ufunc path
          */
-        PyObject *wrap;
-        if (out != NULL) {
+        PyObject *wrap = NULL;
+        if (out != NULL || out_obj == (PyObject *)&PyArray_Type) {
+            /*
+             * If out is passed in, we do not use __array_wrap__. Also if
+             * out=np.ndarray, we do not wrap (and thus return an ndarray).
+             */
+            Py_INCREF(Py_None);
             wrap = Py_None;
-            Py_INCREF(wrap);
         }
         else if (Py_TYPE(op) != Py_TYPE(ret)) {
             wrap = PyObject_GetAttr(op, npy_um_str_array_wrap);
@@ -4710,9 +4729,6 @@ PyUFunc_GenericReduction(PyUFuncObject *ufunc, PyObject *args,
                 Py_DECREF(wrap);
                 wrap = NULL;
             }
-        }
-        else {
-            wrap = NULL;
         }
         return _apply_array_wrap(wrap, ret, NULL);
     }
