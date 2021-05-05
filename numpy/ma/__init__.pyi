@@ -57,6 +57,7 @@ correlate: Any
 cos: Any
 cosh: Any
 count: Any
+count_nonzero: Any
 cumprod: Any
 cumsum: Any
 default_fill_value: Any
