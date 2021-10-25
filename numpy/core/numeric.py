@@ -2167,12 +2167,14 @@ _identity_with_like = array_function_dispatch(
 )(identity)
 
 
-def _allclose_dispatcher(a, b, rtol=None, atol=None, equal_nan=None):
+def _allclose_dispatcher(a, b, rtol=None, atol=None, equal_nan=None,
+                         casting=None):
     return (a, b)
 
 
 @array_function_dispatch(_allclose_dispatcher)
-def allclose(a, b, rtol=1.e-5, atol=1.e-8, equal_nan=False):
+def allclose(a, b, rtol=1.e-5, atol=1.e-8, equal_nan=False,
+             casting='same_kind'):
     """
     Returns True if two arrays are element-wise equal within a tolerance.
 
@@ -2196,6 +2198,15 @@ def allclose(a, b, rtol=1.e-5, atol=1.e-8, equal_nan=False):
     equal_nan : bool
         Whether to compare NaN's as equal.  If True, NaN's in `a` will be
         considered equal to NaN's in `b` in the output array.
+    casting : {'no', 'equiv', 'safe', 'same_kind', 'unsafe'}, optional
+        Controls what kind of data casting may occur.
+
+          * 'no' means the data types should not be cast at all.
+          * 'equiv' means only byte-order changes are allowed.
+          * 'safe' means only casts which can preserve values are allowed.
+          * 'same_kind' means only safe casts or casts within a kind,
+            like float64 to float32, are allowed.
+          * 'unsafe' means any data conversions may be done.
 
         .. versionadded:: 1.10.0
 
@@ -2242,16 +2253,19 @@ def allclose(a, b, rtol=1.e-5, atol=1.e-8, equal_nan=False):
     True
 
     """
-    res = all(isclose(a, b, rtol=rtol, atol=atol, equal_nan=equal_nan))
+    res = all(isclose(a, b, rtol=rtol, atol=atol, equal_nan=equal_nan,
+                      casting=casting))
     return bool(res)
 
 
-def _isclose_dispatcher(a, b, rtol=None, atol=None, equal_nan=None):
+def _isclose_dispatcher(a, b, rtol=None, atol=None, equal_nan=None,
+                        casting=None):
     return (a, b)
 
 
 @array_function_dispatch(_isclose_dispatcher)
-def isclose(a, b, rtol=1.e-5, atol=1.e-8, equal_nan=False):
+def isclose(a, b, rtol=1.e-5, atol=1.e-8, equal_nan=False,
+            casting='same_kind'):
     """
     Returns a boolean array where two arrays are element-wise equal within a
     tolerance.
@@ -2275,6 +2289,15 @@ def isclose(a, b, rtol=1.e-5, atol=1.e-8, equal_nan=False):
     equal_nan : bool
         Whether to compare NaN's as equal.  If True, NaN's in `a` will be
         considered equal to NaN's in `b` in the output array.
+    casting : {'no', 'equiv', 'safe', 'same_kind', 'unsafe'}, optional
+        Controls what kind of data casting may occur.
+
+          * 'no' means the data types should not be cast at all.
+          * 'equiv' means only byte-order changes are allowed.
+          * 'safe' means only casts which can preserve values are allowed.
+          * 'same_kind' means only safe casts or casts within a kind,
+            like float64 to float32, are allowed.
+          * 'unsafe' means any data conversions may be done.
 
     Returns
     -------
@@ -2338,6 +2361,14 @@ def isclose(a, b, rtol=1.e-5, atol=1.e-8, equal_nan=False):
     x = asanyarray(a)
     y = asanyarray(b)
 
+    if not (
+        np.can_cast(x.dtype, y.dtype, casting=casting) or
+        np.can_cast(y.dtype, x.dtype, casting=casting)
+    ):
+        raise TypeError(f"Cannot compare types {x.dtype!r} and {y.dtype!r} "
+                        f"with casting rule {casting!r}")
+
+
     # Make sure y is an inexact type to avoid bad behavior on abs(MIN_INT).
     # This will cause casting of x later. Also, make sure to allow subclasses
     # (e.g., for numpy.ma).
@@ -2375,12 +2406,12 @@ def isclose(a, b, rtol=1.e-5, atol=1.e-8, equal_nan=False):
         return cond[()]  # Flatten 0d arrays to scalars
 
 
-def _array_equal_dispatcher(a1, a2, equal_nan=None):
+def _array_equal_dispatcher(a1, a2, equal_nan=None, casting=None):
     return (a1, a2)
 
 
 @array_function_dispatch(_array_equal_dispatcher)
-def array_equal(a1, a2, equal_nan=False):
+def array_equal(a1, a2, equal_nan=False, casting='unsafe'):
     """
     True if two arrays have the same shape and elements, False otherwise.
 
@@ -2392,6 +2423,15 @@ def array_equal(a1, a2, equal_nan=False):
         Whether to compare NaN's as equal. If the dtype of a1 and a2 is
         complex, values will be considered equal if either the real or the
         imaginary component of a given value is ``nan``.
+    casting : {'no', 'equiv', 'safe', 'same_kind', 'unsafe'}, optional
+        Controls what kind of data casting may occur.
+
+          * 'no' means the data types should not be cast at all.
+          * 'equiv' means only byte-order changes are allowed.
+          * 'safe' means only casts which can preserve values are allowed.
+          * 'same_kind' means only safe casts or casts within a kind,
+            like float64 to float32, are allowed.
+          * 'unsafe' means any data conversions may be done.
 
         .. versionadded:: 1.19.0
 
@@ -2439,6 +2479,14 @@ def array_equal(a1, a2, equal_nan=False):
         return False
     if a1.shape != a2.shape:
         return False
+
+    if not (
+        np.can_cast(a1.dtype, a2.dtype, casting=casting) or
+        np.can_cast(a2.dtype, a1.dtype, casting=casting)
+    ):
+        raise TypeError(f"Cannot compare types {a1.dtype!r} and {a2.dtype!r} "
+                        f"with casting rule {casting!r}")
+
     if not equal_nan:
         return bool(asarray(a1 == a2).all())
     # Handling NaN values if equal_nan is True
@@ -2450,12 +2498,12 @@ def array_equal(a1, a2, equal_nan=False):
     return bool(asarray(a1[~a1nan] == a2[~a1nan]).all())
 
 
-def _array_equiv_dispatcher(a1, a2):
+def _array_equiv_dispatcher(a1, a2, casting=None):
     return (a1, a2)
 
 
 @array_function_dispatch(_array_equiv_dispatcher)
-def array_equiv(a1, a2):
+def array_equiv(a1, a2, casting='same_kind'):
     """
     Returns True if input arrays are shape consistent and all elements equal.
 
@@ -2466,6 +2514,15 @@ def array_equiv(a1, a2):
     ----------
     a1, a2 : array_like
         Input arrays.
+    casting : {'no', 'equiv', 'safe', 'same_kind', 'unsafe'}, optional
+        Controls what kind of data casting may occur.
+
+          * 'no' means the data types should not be cast at all.
+          * 'equiv' means only byte-order changes are allowed.
+          * 'safe' means only casts which can preserve values are allowed.
+          * 'same_kind' means only safe casts or casts within a kind,
+            like float64 to float32, are allowed.
+          * 'unsafe' means any data conversions may be done.
 
     Returns
     -------
@@ -2498,6 +2555,13 @@ def array_equiv(a1, a2):
         multiarray.broadcast(a1, a2)
     except Exception:
         return False
+
+    if not (
+        np.can_cast(a1.dtype, a2.dtype, casting=casting) or
+        np.can_cast(a2.dtype, a1.dtype, casting=casting)
+    ):
+        raise TypeError(f"Cannot compare types {a1.dtype!r} and {a2.dtype!r} "
+                        f"with casting rule {casting!r}")
 
     return bool(asarray(a1 == a2).all())
 

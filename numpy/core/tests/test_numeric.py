@@ -1672,6 +1672,13 @@ class TestArrayComparisons:
         assert_(not np.array_equal(a, b, equal_nan=False))
         assert_(np.array_equal(a, b, equal_nan=True))
 
+    def test_cast_valid(self):
+        assert np.array_equal([0, 1], [False, True], casting='unsafe')
+
+    def test_cast_invalid(self):
+        with pytest.raises(TypeError) as e:
+            np.array_equal([0, 1], [False, True], casting='no')
+
     def test_none_compares_elementwise(self):
         a = np.array([None, 1, None], dtype=object)
         assert_equal(a == None, [True, False, True])
@@ -1711,6 +1718,13 @@ class TestArrayComparisons:
         assert_(not res)
         assert_(type(res) is bool)
 
+    def test_cast_valid(self):
+        assert np.array_equiv([0, 1], [False, True], casting='unsafe')
+
+    def test_cast_invalid(self):
+        with pytest.raises(TypeError) as e:
+            np.array_equiv([0, 1], [False, True], casting='no')
+
     @pytest.mark.parametrize("dtype", ["V0", "V3", "V10"])
     def test_compare_unstructured_voids(self, dtype):
         zeros = np.zeros(3, dtype=dtype)
@@ -1726,7 +1740,6 @@ class TestArrayComparisons:
 
         assert not (zeros == nonzeros).any()
         assert (zeros != nonzeros).all()
-
 
 def assert_array_strict_equal(x, y):
     assert_array_equal(x, y)
@@ -2602,6 +2615,12 @@ class TestIsclose:
         assert np.allclose(a, a, atol=0, equal_nan=True)
         assert np.allclose(a, a, atol=np.timedelta64(1, "ns"), equal_nan=True)
 
+    def test_cast_valid(self):
+        assert all(np.isclose([0, 1], [False, True], casting='unsafe'))
+
+    def test_cast_invalid(self):
+        with pytest.raises(TypeError) as e:
+            np.isclose([0, 1], [False, True], casting='no')
 
 class TestStdVar:
     def setup(self):
