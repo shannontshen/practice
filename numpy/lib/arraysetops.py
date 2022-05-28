@@ -18,7 +18,7 @@ import functools
 
 import numpy as np
 from numpy.core import overrides
-
+from numpy.core import multiarray
 
 array_function_dispatch = functools.partial(
     overrides.array_function_dispatch, module='numpy')
@@ -131,13 +131,13 @@ def _unpack_tuple(x):
 
 
 def _unique_dispatcher(ar, return_index=None, return_inverse=None,
-                       return_counts=None, axis=None):
+                       return_counts=None, axis=None, equal_nans=None):
     return (ar,)
 
 
 @array_function_dispatch(_unique_dispatcher)
 def unique(ar, return_index=False, return_inverse=False,
-           return_counts=False, axis=None):
+           return_counts=False, axis=None, equal_nans=True):
     """
     Find the unique elements of an array.
 
@@ -162,8 +162,10 @@ def unique(ar, return_index=False, return_inverse=False,
     return_counts : bool, optional
         If True, also return the number of times each unique item appears
         in `ar`.
+    equals_nan : bool, optional
+        If True, collapses multiple NaN values in return array into 1
 
-        .. versionadded:: 1.9.0
+        .. versionchanged: NumPy 1.23
 
     axis : int or None, optional
         The axis to operate on. If None, `ar` will be flattened. If an integer,
@@ -188,8 +190,10 @@ def unique(ar, return_index=False, return_inverse=False,
     unique_counts : ndarray, optional
         The number of times each of the unique values comes up in the
         original array. Only provided if `return_counts` is True.
+    unique_1NaN : ndarray, optional
+        The sorted unique values with no duplicate NaN values
 
-        .. versionadded:: 1.9.0
+        .. versionchanged: NumPy 1.23
 
     See Also
     --------
@@ -266,10 +270,22 @@ def unique(ar, return_index=False, return_inverse=False,
     >>> np.repeat(values, counts)
     array([1, 2, 2, 2, 3, 4, 6])    # original order not preserved
 
+    Return the values of an array with NaNs unique from one another:
+
+    >>> a = np.unique([1, 1, 2, 2, 3, 3, np.nan, np.nan], equal_nans = False)
+    >>> b = np.array([1, 2, 3, np.nan, np.nan])
+    >>> np.array_equal(a, b, equal_nan = True)
+    True
+    >>> a = np.array([[1, np.nan, 0], [1, np.nan, 0], [2, 3, 4]])
+    >>> b = np.unique(a, axis=0, equal_nans = False)
+    >>> np.array_equal(a, b, equal_nan = True)
+    True
+
     """
     ar = np.asanyarray(ar)
     if axis is None:
-        ret = _unique1d(ar, return_index, return_inverse, return_counts)
+        ret = _unique1d(ar, return_index, return_inverse,
+        return_counts, equal_nans)
         return _unpack_tuple(ret)
 
     # axis was specified and not None
@@ -312,13 +328,13 @@ def unique(ar, return_index=False, return_inverse=False,
         return uniq
 
     output = _unique1d(consolidated, return_index,
-                       return_inverse, return_counts)
+                       return_inverse, return_counts, equal_nans)
     output = (reshape_uniq(output[0]),) + output[1:]
     return _unpack_tuple(output)
 
 
 def _unique1d(ar, return_index=False, return_inverse=False,
-              return_counts=False):
+              return_counts=False, equal_nans=True):
     """
     Find the unique elements of an array, ignoring shape.
     """
@@ -334,8 +350,10 @@ def _unique1d(ar, return_index=False, return_inverse=False,
         aux = ar
     mask = np.empty(aux.shape, dtype=np.bool_)
     mask[:1] = True
-    if aux.shape[0] > 0 and aux.dtype.kind in "cfmM" and np.isnan(aux[-1]):
-        if aux.dtype.kind == "c":  # for complex all NaNs are considered equivalent
+        
+    if (equal_nans and aux.shape[0] > 0 and aux.dtype.kind in "cfmM" and
+    np.isnan(aux[-1])):
+        if aux.dtype.kind == "c":  # for complex all NaNs are equivalent
             aux_firstnan = np.searchsorted(np.isnan(aux), True, side='left')
         else:
             aux_firstnan = np.searchsorted(aux, aux[-1], side='left')
@@ -344,6 +362,19 @@ def _unique1d(ar, return_index=False, return_inverse=False,
                 aux[1:aux_firstnan] != aux[:aux_firstnan - 1])
         mask[aux_firstnan] = True
         mask[aux_firstnan + 1:] = False
+    elif equal_nans and aux.shape[0] > 0 and len(aux.dtype) > 1:
+        tracker = 0
+        while tracker < len(aux) - 1:
+            for key in aux[tracker].dtype.names:
+                if (aux[tracker][key] == aux[tracker+1][key] or 
+                (str(aux[tracker][key]) == "nan" and str(aux[tracker+1][key])
+                == "nan")):
+                    mask[tracker + 1] = False
+                else:
+                    mask[tracker + 1] = True
+                    break
+            tracker += 1
+            
     else:
         mask[1:] = aux[1:] != aux[:-1]
 
