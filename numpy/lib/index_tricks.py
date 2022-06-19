@@ -1025,7 +1025,6 @@ class ndrange(collections.abc.Sequence):
             raise ValueError('order must be one of "C", "F", "A", or "K"')
 
 
-
 @set_module('numpy')
 class ndindex(object):
     """
