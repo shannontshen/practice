@@ -945,36 +945,18 @@ class ndrange(collections.abc.Sequence):
                             'mixture of slices or integers.')
 
         new_ranges = tuple(r[s] for r, s in zip(self._ranges, sl))
-        if sys.version_info[0] < 3:
-            start = []
-            stop = []
-            step = []
-            singleton = True
-            for r in new_ranges:
-                if isinstance(r, list):
-                    singleton = False
-                    start.append(r[0])
-                    stop.append(r[-1] + 1 if r[-1] >= r[0] else r[-1] - 1)
-                    step.append(1 if len(r) <= 1 else (r[-1] - r[0]) // (len(r) - 1))
-                else:
-                    start.append(r)
-                    stop.append(r+1)
-                    step.append(1)
-
-            if singleton:
-                return tuple(start)
-            start = tuple(start)
-            stop = tuple(stop)
-            step = tuple(step)
-        else:
-            # If they are all singletons, then we need to return an index.
-            if all(not isinstance(r, range) for r in new_ranges):
-                return new_ranges
-            # If any of them are ranges, we need to cast all the other
-            # ones to ranges as well
-            start, stop, step = zip(
-                *((r.start, r.stop, r.step) if isinstance(r, range) else (r, r+1, 1)
-                for r in new_ranges))
+        # If they are all singletons, then we need to return an index.
+        if all(not isinstance(r, range) for r in new_ranges):
+            return new_ranges
+        # If any of them are ranges, we need to cast all the other
+        # ones to ranges as well
+        start, stop, step = zip(
+            *(
+                (r.start, r.stop, r.step)
+                if isinstance(r, range) else (r, r+1, 1)
+                for r in new_ranges
+            )
+        )
 
         return ndrange(start, stop, step)
 
