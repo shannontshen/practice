@@ -10,7 +10,7 @@ from numpy.lib.index_tricks import (
     index_exp, ndindex, ndrange, r_, s_, ix_
     )
 
-from numpy.core.numeric import collections_abc
+import collections.abc
 import pytest
 from random import shuffle
 
@@ -568,7 +568,7 @@ def ndrange_tester_helper(expected, not_expected,
         kwargs['step'] = step
 
     r = ndrange(**kwargs)
-    if isinstance(stop, collections_abc.Iterable):
+    if isinstance(stop, collections.abc.Iterable):
         assert r.ndim == len(stop)
     else:
         assert r.ndim == 1
@@ -579,7 +579,7 @@ def ndrange_tester_helper(expected, not_expected,
     assert_equal(len(expected), len(r))
 
     assert stop not in r
-    assert isinstance(r, collections_abc.Sequence)
+    assert isinstance(r, collections.abc.Sequence)
 
     # copy the list
     shuffled = list(expected)
