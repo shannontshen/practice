@@ -613,14 +613,12 @@ def ndrange_tester_helper(expected, not_expected,
     for arr_item, list_item in zip(r.flat, x):
         assert arr_item == list_item
 
-
     for indx, value in enumerate(r.ravel()):
         assert expected[indx] == value
 
     for order in 'CAK':
         for indx, value in enumerate(r.ravel(order)):
             assert expected[indx] == value
-
 
     r_f_order = (i[::-1] for i in ndrange(start=r.start[::-1],
                                           stop=r.stop[::-1],
@@ -635,7 +633,8 @@ def test_ndrange():
     ndrange_tester_helper(expected, not_expected, stop=5)
     # 1D
     expected = [(0,), (2,)]
-    ndrange_tester_helper(expected, not_expected, stop=5, slices=slice(0, 4, 2))
+    ndrange_tester_helper(
+        expected, not_expected, stop=5, slices=slice(0, 4, 2))
 
     # 2D
     expected = [(1, 0), (1, 3), (1, 6),
@@ -681,10 +680,11 @@ def test_ndrange_failers():
     assert_raises(ValueError, ndrange, (0, 1, 2), (1, 2), (1, 2))
 
     assert_raises(TypeError, ndrange, (.0, 1, 2), (0, 1, 2), (1, 1, 2))
-    # assert_raises(TypeError, ndrange, (np.float32(0.1), 1, 2), (0, 1, 2), (1, 1, 2))
-    # No joke, this actually doesn't ranse an error in Python 2.7.
-    # https://github.com/numpy/numpy/issues/12149
-    assert_raises(TypeError, ndrange, (np.float64(0.1), 1, 2), (0, 1, 2), (1, 1, 2))
+
+    assert_raises(TypeError, ndrange,
+                  (np.float32(0.1), 1, 2), (0, 1, 2), (1, 1, 2))
+    assert_raises(TypeError, ndrange,
+                  (np.float64(0.1), 1, 2), (0, 1, 2), (1, 1, 2))
     assert_raises(TypeError, ndrange, (0, 1, 2), (0, .1, 2), (1, 1, 2))
     assert_raises(TypeError, ndrange, (0, 1, 2), (0, 1, 2), (1, .1, 2))
 
@@ -737,13 +737,15 @@ def test_ndrange_equality():
     assert_equal(hash(r1), hash(r2))
     assert hash(r1) != hash(r3)
 
+
 def test_ndrange_negative():
     expected = [(r,) for r in range(4, -1, -1)]
     not_expected = [(-1,), (7,), (1, 2)]
     ndrange_tester_helper(expected, not_expected, start=4, stop=-1, step=-1)
     # 1D
     expected = [(2,), (0,)]
-    ndrange_tester_helper(expected, not_expected, stop=5, slices=slice(2, None, -2))
+    ndrange_tester_helper(
+        expected, not_expected, stop=5, slices=slice(2, None, -2))
 
     # 2D
     expected = [(1, -3), (1, 0), (1, 3), (1, 6),
@@ -772,5 +774,7 @@ def test_ndrange_negative():
 def test_ndrange_repr(s_func):
     assert s_func(np.ndrange(5)) == 'numpy.ndrange((0,), (5,))'
     assert s_func(np.ndrange(0, 5, 2)) == 'numpy.ndrange((0,), (5,), (2,))'
-    assert s_func(np.ndrange([0, 0], (1, 5), (1, 2))) == 'numpy.ndrange((0, 0), (1, 5), (1, 2))'
-    assert s_func(np.ndrange((0, 0), [1, 5], (1, 1))) == 'numpy.ndrange((0, 0), (1, 5))'
+    assert s_func(np.ndrange([0, 0], (1, 5), (1, 2))) == \
+           'numpy.ndrange((0, 0), (1, 5), (1, 2))'
+    assert s_func(np.ndrange((0, 0), [1, 5], (1, 1))) == \
+           'numpy.ndrange((0, 0), (1, 5))'
