@@ -3,6 +3,7 @@ import itertools
 import sys
 import math
 import warnings
+import collections.abc
 
 import numpy.core.numeric as _nx
 from numpy.core.numeric import (
@@ -613,7 +614,7 @@ class ndenumerate:
 
 
 @set_module('numpy')
-class ndrange(_nx.collections_abc.Sequence):
+class ndrange(collections.abc.Sequence):
     """
     An N-dimensional range-like object for indexing arrays.
 
