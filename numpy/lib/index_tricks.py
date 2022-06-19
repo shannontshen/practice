@@ -810,21 +810,21 @@ class ndrange(collections.abc.Sequence):
                 '``stop`` are provided.')
 
         # Is there a function that deals with this input sanitization for me?
-        if not isinstance(stop, _nx.collections_abc.Iterable):
+        if not isinstance(stop, collections.abc.Iterable):
             stop = (stop,)
         elif not isinstance(stop, tuple):
             stop = tuple(stop)
 
         if start is None:
             start = (0,) * len(stop)
-        elif not isinstance(start, _nx.collections_abc.Iterable):
+        elif not isinstance(start, collections.abc.Iterable):
             start = (start,)
         elif not isinstance(start, tuple):
             start = tuple(start)
 
         if step is None:
             step = (1,) * len(stop)
-        elif not isinstance(step, _nx.collections_abc.Iterable):
+        elif not isinstance(step, collections.abc.Iterable):
             step = (step,)
         elif not isinstance(step, tuple):
             step = tuple(step)
