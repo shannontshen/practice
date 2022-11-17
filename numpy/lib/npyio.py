@@ -908,9 +908,10 @@ def _read(fname, *, delimiter=',', comment='#', quote='"',
         read_dtype_via_object_chunks = dtype
         dtype = np.dtype(object)
 
-    if usecols is not None:
-        # Allow usecols to be a single int or a sequence of ints, the C-code
-        # handles the rest
+    if usecols is not None and not callable(usecols):
+        # If usecols is not callable, it must be an int or a sequence of ints.
+        # Process usecols so that when it is not a callable, it is a list; the
+        # C code will handle the rest of the validation.
         try:
             usecols = list(usecols)
         except TypeError:
@@ -1125,15 +1126,24 @@ def loadtxt(fname, dtype=float, comments='#', delimiter=None,
 
     skiprows : int, optional
         Skip the first `skiprows` lines, including comments; default: 0.
-    usecols : int or sequence, optional
+    usecols : int, sequence of ints, or callable, optional
         Which columns to read, with 0 being the first. For example,
         ``usecols = (1,4,5)`` will extract the 2nd, 5th and 6th columns.
         The default, None, results in all columns being read.
+
+        `usecols` may be a callable function that accepts a single integer
+        argument that gives the number of columns in the file. The callable
+        must return a sequence of integers that indicate which columns to
+        include in the output array.
 
         .. versionchanged:: 1.11.0
             When a single column has to be read it is possible to use
             an integer instead of a tuple. E.g ``usecols = 3`` reads the
             fourth column the same way as ``usecols = (3,)`` would.
+
+        .. versionchanged:: 1.24.0
+            Added the option for `usecols` to be a callable.
+
     unpack : bool, optional
         If True, the returned array is transposed, so that arguments may be
         unpacked using ``x, y, z = loadtxt(...)``.  When used with a
@@ -1310,7 +1320,8 @@ def loadtxt(fname, dtype=float, comments='#', delimiter=None,
     >>> np.loadtxt(s, dtype="U", delimiter=",", quotechar='"')
     array('Hello, my name is "Monty"!', dtype='<U26')
 
-    Read subset of columns when all rows do not contain equal number of values:
+    Use ``usecols`` to read a subset of the columns when all rows do not
+    contain an equal number of values:
 
     >>> d = StringIO("1 2\n2 4\n3 9 12\n4 16 20")
     >>> np.loadtxt(d, usecols=(0, 1))
@@ -1318,6 +1329,22 @@ def loadtxt(fname, dtype=float, comments='#', delimiter=None,
            [ 2.,  4.],
            [ 3.,  9.],
            [ 4., 16.]])
+
+    `usecols` can be a callable function.  This example shows how `usecols`
+    can be used to skip the second column of the input file.
+
+    >>> s1 = StringIO('10.25 ABC 1.5 3.5\n12.50 XYZ 2.5 8.0')
+    >>> np.loadtxt(s1, usecols=lambda n: [0] + list(range(2, n)))
+    array([[10.25,  1.5 ,  3.5 ],
+           [12.5 ,  2.5 ,  8.  ]])
+
+    The caller does not have to know the number of columns in advance.
+    The same example works with this input, which has more columns.
+
+    >>> s2 = StringIO('10.25 ABC 1.5 3.5 5.5\n12.50 XYZ 2.5 8.0 9.5')
+    >>> np.loadtxt(s2, usecols=lambda n: [0] + list(range(2, n)))
+    array([[10.25,  1.5 ,  3.5 ,  5.5 ],
+           [12.5 ,  2.5 ,  8.  ,  9.5 ]])
 
     """
 

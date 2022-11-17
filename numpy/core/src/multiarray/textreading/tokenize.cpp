@@ -1,4 +1,4 @@
-
+#define PY_SSIZE_T_CLEAN
 #include <Python.h>
 
 #define NPY_NO_DEPRECATED_API NPY_API_VERSION
@@ -446,6 +446,8 @@ tokenizer_init(tokenizer_state *ts, parser_config *config)
 
     ts->fields = (field_info *)PyMem_Malloc(4 * sizeof(*ts->fields));
     if (ts->fields == nullptr) {
+        PyMem_Free(ts->field_buffer);
+        ts->field_buffer = nullptr;
         PyErr_NoMemory();
         return -1;
     }
