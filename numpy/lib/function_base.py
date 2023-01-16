@@ -2709,13 +2709,13 @@ def cov(m, y=None, rowvar=True, bias=False, ddof=None, fweights=None,
 
 
 def _corrcoef_dispatcher(x, y=None, rowvar=None, bias=None, ddof=None, *,
-                         dtype=None):
+                         dtype=None, covM=False):
     return (x, y)
 
 
 @array_function_dispatch(_corrcoef_dispatcher)
 def corrcoef(x, y=None, rowvar=True, bias=np._NoValue, ddof=np._NoValue, *,
-             dtype=None):
+             dtype=None, covM=False):
     """
     Return Pearson product-moment correlation coefficients.
 
@@ -2754,6 +2754,12 @@ def corrcoef(x, y=None, rowvar=True, bias=np._NoValue, ddof=np._NoValue, *,
         at least `numpy.float64` precision.
 
         .. versionadded:: 1.20
+
+    covM : boolean, optional
+        If covM is true then this function assumes that the parameter
+        matrix 'x' passed to this function is a pre-calculated covariance matrix
+        and the call to Numpy.cov will be ignored. The default for this parameter
+        is False.
 
     Returns
     -------
@@ -2845,7 +2851,10 @@ def corrcoef(x, y=None, rowvar=True, bias=np._NoValue, ddof=np._NoValue, *,
         # 2015-03-15, 1.10
         warnings.warn('bias and ddof have no effect and are deprecated',
                       DeprecationWarning, stacklevel=3)
-    c = cov(x, y, rowvar, dtype=dtype)
+    if covM is False:
+        c = cov(x, y, rowvar, dtype=dtype)
+    else:
+        c = x
     try:
         d = diag(c)
     except ValueError:
