@@ -63,7 +63,9 @@ typedef double     npyv_lanetype_f64;
     #include "vec/vec.h"
 #endif
 
-#ifdef NPY_HAVE_NEON
+#if defined(NPY_HAVE_SVE)
+    #include "sve/sve.h"
+#elif defined(NPY_HAVE_NEON)
     #include "neon/neon.h"
 #endif
 
@@ -87,8 +89,10 @@ typedef double     npyv_lanetype_f64;
     #define NPY_SIMD_CMPSIGNAL 0
 #endif
 
-// enable emulated mask operations for all SIMD extension except for AVX512
-#if !defined(NPY_HAVE_AVX512F) && NPY_SIMD && NPY_SIMD < 512
+// enable emulated mask operations for all SIMD extension
+// except for AVX512 and SVE
+#if (!defined(NPY_HAVE_AVX512F) && !defined(NPY_HAVE_SVE)) \
+    && NPY_SIMD && NPY_SIMD < 512
     #include "emulate_maskop.h"
 #endif
 
