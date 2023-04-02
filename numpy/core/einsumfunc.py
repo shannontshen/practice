@@ -850,7 +850,8 @@ def einsum_path(*operands, optimize='greedy', einsum_call=False):
     inner_product = (
         sum(len(set(x)) for x in input_subscripts.split(',')) - num_indices
     ) > 0
-    naive_cost = _flop_count(indices, inner_product, num_inputs, dimension_dict)
+    naive_cost = _flop_count(indices, inner_product, num_inputs,
+                             dimension_dict)
 
     opt_cost = sum(cost_list) + 1
     speedup = naive_cost / opt_cost
@@ -879,10 +880,12 @@ def einsum_path(*operands, optimize='greedy', einsum_call=False):
 
 def _parse_eq_to_pure_multiplication(a_term, shape_a, b_term, shape_b, out):
     """If there are no contracted indices, then we can directly transpose and
-    insert singleton dimensions into ``a`` and ``b`` such that (broadcasted)
+    insert singleton dimensions into ``a`` and ``b`` such that (broadcast)
     elementwise multiplication performs the einsum.
 
-    No need to cache this as it is within the cached ``_parse_eq_to_batch_matmul``.
+    No need to cache this as it is within the cached
+    ``_parse_eq_to_batch_matmul``.
+    
     """
     desired_a = ""
     desired_b = ""
