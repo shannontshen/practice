@@ -1015,6 +1015,18 @@ class TestMaskedArray:
         mx[1].data[0] = 0.
         assert_(mx2[0] == 0.)
 
+    def test_saving_exception(self):
+
+        # make sure save and savez return exception for masked arrays
+        mx1 = masked_array([1.], mask=[True])
+        exc_text = r'MaskedArray\.tofile\(\) not implemented yet.'
+        with pytest.raises(NotImplementedError, match=exc_text) as e_info:
+            np.save('abc', mx1)
+
+        with pytest.raises(NotImplementedError, match=exc_text) as e_info:
+            np.savez('abc', mx1)
+
+
 
 class TestMaskedArrayArithmetic:
     # Base test class for MaskedArrays.
