@@ -5519,12 +5519,12 @@ def insert(arr, obj, values, axis=None):
     return new
 
 
-def _append_dispatcher(arr, values, axis=None):
+def _append_dispatcher(arr, values, axis=None, dtype=None):
     return (arr, values)
 
 
 @array_function_dispatch(_append_dispatcher)
-def append(arr, values, axis=None):
+def append(arr, values, axis=None, dtype=None):
     """
     Append values to the end of an array.
 
@@ -5540,6 +5540,8 @@ def append(arr, values, axis=None):
     axis : int, optional
         The axis along which `values` are appended.  If `axis` is not
         given, both `arr` and `values` are flattened before use.
+    dtype : data-type, optional
+        If provided, the copy of `arr` will have this dtype.
 
     Returns
     -------
@@ -5578,7 +5580,7 @@ def append(arr, values, axis=None):
             arr = arr.ravel()
         values = ravel(values)
         axis = arr.ndim-1
-    return concatenate((arr, values), axis=axis)
+    return concatenate((arr, values), dtype=dtype, axis=axis)
 
 
 def _digitize_dispatcher(x, bins, right=None):
