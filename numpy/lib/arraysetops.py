@@ -166,7 +166,7 @@ def unique(ar, return_index=False, return_inverse=False,
         The axis to operate on. If None, `ar` will be flattened. If an integer,
         the subarrays indexed by the given axis will be flattened and treated
         as the elements of a 1-D array with the dimension of the given axis,
-        see the notes for more details.  Object arrays or structured arrays
+        see the notes for more details. Object arrays or structured arrays
         that contain objects are not supported if the `axis` kwarg is used. The
         default is None.
 
@@ -270,7 +270,14 @@ def unique(ar, return_index=False, return_inverse=False,
 
     """
     ar = np.asanyarray(ar)
-    if axis is None:
+
+    # Two early return cases when array will be flatten:
+    #   - When axis is None.
+    #     Array will be flatten and return only new elements.
+    #   - Axis is 0 and this is 1-D array.
+    #     Thus moving of axis 0 in 1-D array results in the same array.
+    #     Which is simply equal to the flatten array.
+    if axis is None or (axis == 0 and ar.ndim == 1):
         ret = _unique1d(ar, return_index, return_inverse, return_counts, 
                         equal_nan=equal_nan)
         return _unpack_tuple(ret)
@@ -283,10 +290,11 @@ def unique(ar, return_index=False, return_inverse=False,
         raise np.exceptions.AxisError(axis, ar.ndim) from None
 
     # Must reshape to a contiguous 2D array for this to work...
-    orig_shape, orig_dtype = ar.shape, ar.dtype
+    orig_shape, orig_dtype, orig_dim = ar.shape, ar.dtype, ar.ndim
     ar = ar.reshape(orig_shape[0], np.prod(orig_shape[1:], dtype=np.intp))
     ar = np.ascontiguousarray(ar)
-    dtype = [('f{i}'.format(i=i), ar.dtype) for i in range(ar.shape[1])]
+
+    dtype = [('f{i}'.format(i=i), ar.dtype) for i in range(ar.shape[1])]        
 
     # At this point, `ar` has shape `(n, m)`, and `dtype` is a structured
     # data type with `m` fields where each field has the data type of `ar`.
@@ -307,6 +315,28 @@ def unique(ar, return_index=False, return_inverse=False,
         msg = 'The axis argument to unique is not supported for dtype {dt}'
         raise TypeError(msg.format(dt=ar.dtype)) from e
 
+    # If original array fulfill all requirements:
+    #   - is 2-D
+    #   - has "simple"/unstructred dtype,
+    #     i.e. all elements can be safely interpreted as np.float32 or np.int64
+    #   - original shape is not equal to 0 (in any dimension)
+    # Then this optimization might be used to speed up unique computation along
+    # axis equal to either 0 or 1.
+    if (orig_dim == 2 and len(orig_dtype) < 2 and
+       all(i > 0 for i in orig_shape)):
+        output = _unique2d(consolidated, return_index,
+                           return_inverse, return_counts, equal_nan=equal_nan,
+                           orig_dtype=orig_dtype, orig_shape=orig_shape)
+        # output is already reshaped and in the original dtype.
+        # Only move the axis to restore correct order.
+        output = (np.moveaxis(output[0], 0, axis),) + output[1:]
+        return _unpack_tuple(output)
+
+    # For every other scenario treat it as flattened 1-D array of structured
+    # types. This path include cases like: 3-D inputs or structured dtypes.
+    output = _unique1d(consolidated, return_index,
+                       return_inverse, return_counts, equal_nan=equal_nan)
+
     def reshape_uniq(uniq):
         n = len(uniq)
         uniq = uniq.view(orig_dtype)
@@ -314,22 +344,19 @@ def unique(ar, return_index=False, return_inverse=False,
         uniq = np.moveaxis(uniq, 0, axis)
         return uniq
 
-    output = _unique1d(consolidated, return_index,
-                       return_inverse, return_counts, equal_nan=equal_nan)
     output = (reshape_uniq(output[0]),) + output[1:]
     return _unpack_tuple(output)
 
 
-def _unique1d(ar, return_index=False, return_inverse=False,
-              return_counts=False, *, equal_nan=True):
+def _unique_preprocess(ar, return_index=False, return_inverse=False):
     """
-    Find the unique elements of an array, ignoring shape.
+    Helper function to prepare a mask and sort a consolidated array for
+    _uniqueXd.
     """
     ar = np.asanyarray(ar).flatten()
 
-    optional_indices = return_index or return_inverse
-
-    if optional_indices:
+    perm = None
+    if return_index or return_inverse:
         perm = ar.argsort(kind='mergesort' if return_index else 'quicksort')
         aux = ar[perm]
     else:
@@ -337,21 +364,18 @@ def _unique1d(ar, return_index=False, return_inverse=False,
         aux = ar
     mask = np.empty(aux.shape, dtype=np.bool_)
     mask[:1] = True
-    if (equal_nan and aux.shape[0] > 0 and aux.dtype.kind in "cfmM" and
-            np.isnan(aux[-1])):
-        if aux.dtype.kind == "c":  # for complex all NaNs are considered equivalent
-            aux_firstnan = np.searchsorted(np.isnan(aux), True, side='left')
-        else:
-            aux_firstnan = np.searchsorted(aux, aux[-1], side='left')
-        if aux_firstnan > 0:
-            mask[1:aux_firstnan] = (
-                aux[1:aux_firstnan] != aux[:aux_firstnan - 1])
-        mask[aux_firstnan] = True
-        mask[aux_firstnan + 1:] = False
-    else:
-        mask[1:] = aux[1:] != aux[:-1]
 
+    return aux, mask, perm
+
+
+def _unique_return(aux, mask, perm=None, return_index=False,
+                   return_inverse=False, return_counts=False):
+    """
+    Helper function to apply all necessary masks and transforms to
+    _uniqeXd results.
+    """
     ret = (aux[mask],)
+
     if return_index:
         ret += (perm[mask],)
     if return_inverse:
@@ -362,7 +386,114 @@ def _unique1d(ar, return_index=False, return_inverse=False,
     if return_counts:
         idx = np.concatenate(np.nonzero(mask) + ([mask.size],))
         ret += (np.diff(idx),)
+
     return ret
+
+
+def _unique2d(ar, return_index=False, return_inverse=False,
+              return_counts=False, *, equal_nan=True,
+              orig_dtype=None, orig_shape=None):
+    """
+    Find the unique elements of a 2-D array, when dtype is not structured.
+    """
+    aux, mask, perm = _unique_preprocess(ar, return_index, return_inverse)
+
+    # Additional step to restore original shape and dtype,
+    # this allows to speed up computatations with native/simple dtypes.
+    aux = aux.view(orig_dtype).reshape(len(aux), *orig_shape[1:])
+
+    if equal_nan and aux.shape[0] > 0 and aux.dtype.kind in "cfmM":
+        # Idea is similar to the tracker from _unique1d:
+        #
+        # tracker = 0
+        # while tracker < len(aux) - 1:
+        #     a = aux[tracker]
+        #     b = aux[tracker + 1]
+        #     if np.any((a != b) & ~(np.isnan(a) & np.isnan(b))):
+        #         mask[tracker + 1] = True
+        #     tracker += 1
+        #
+        # This loop can be transformed into optimized numpy calls.
+        # First, let's get all nans - one-time only operation:
+        _nans = np.isnan(aux)
+        # Next step is to operate on slices and apply np.any to reduce rows:
+        mask[1:] = np.any(
+            (aux[1:] != aux[:-1]) & ~(_nans[1:] & _nans[:-1]), axis=1
+        )
+    else:
+        mask[1:] = np.any(aux[1:] != aux[:-1], axis=1)
+
+    return _unique_return(
+        aux, mask, perm, return_index, return_inverse, return_counts
+    )
+
+
+def _unique1d(ar, return_index=False, return_inverse=False,
+              return_counts=False, *, equal_nan=True):
+    """
+    Find the unique elements of an array, ignoring shape.
+    """
+    aux, mask, perm = _unique_preprocess(ar, return_index, return_inverse)
+
+    # _unique1d() relies on the fact that ar is always in a flatten form.
+    # This combined with sort() from preprocess, provide an easy way to
+    # determine if any np.nan is present in the array.
+    if (equal_nan and aux.shape[0] > 0 and
+       aux.dtype.kind in "cfmM" and np.isnan(aux[-1])):
+        # for complex all NaNs are considered equivalent
+        if aux.dtype.kind == "c":
+            aux_firstnan = np.searchsorted(np.isnan(aux), True, side='left')
+        else:
+            aux_firstnan = np.searchsorted(aux, aux[-1], side='left')
+        if aux_firstnan > 0:
+            mask[1:aux_firstnan] = (
+                aux[1:aux_firstnan] != aux[:aux_firstnan - 1]
+            )
+        mask[aux_firstnan] = True
+        mask[aux_firstnan + 1:] = False
+    elif (equal_nan and aux.shape[0] > 0 and len(aux.dtype) > 0
+         and aux.dtype.kind == "V"):
+        def _unique_check(a, b):
+            return a != b and not(np.isnan(a) and np.isnan(b))
+
+        def _unique_tracker(a, b):
+            i = 0
+            inner_len = len(a[0].dtype) - 1
+            while i < len(a) - 1:
+                _a = a[i]
+                _b = b[i]
+                # If values are structured,
+                # compare elements using additional loop.
+                if inner_len > 0:
+                    if _unique_tracker(_a, _b):
+                        return True
+                # If values are not structured,
+                # compare elements one by one.
+                else:
+                    if _unique_check(_a, _b):
+                        return True
+                i += 1
+            return False
+
+        # Set up a tracker that will look for unique entries, "row-by-row".
+        tracker = 0
+        inner_len = len(aux[0].dtype) - 1
+        while tracker < len(aux) - 1:
+            a = aux[tracker]
+            b = aux[tracker + 1]
+            # If values are structured, compare elements using additional loop.
+            if inner_len > 0:
+                mask[tracker + 1] = _unique_tracker(a, b)
+            # If values are not structured, compare elements.
+            else:
+                mask[tracker + 1] = _unique_check(a[0], b[0])
+            tracker += 1
+    else:
+        mask[1:] = aux[1:] != aux[:-1]
+
+    return _unique_return(
+        aux, mask, perm, return_index, return_inverse, return_counts
+    )
 
 
 def _intersect1d_dispatcher(
