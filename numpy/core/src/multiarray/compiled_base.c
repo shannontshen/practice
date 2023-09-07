@@ -115,10 +115,11 @@ arr_bincount(PyObject *NPY_UNUSED(self), PyObject *const *args,
 {
     PyObject *list = NULL, *weight = Py_None, *mlength = NULL;
     PyArrayObject *lst = NULL, *ans = NULL, *wts = NULL;
-    npy_intp *numbers, *ians, len, mx, mn, ans_size;
+    npy_intp *numbers, len, mx, mn, ans_size;
     npy_intp minlength = 0;
     npy_intp i;
-    double *weights , *dans;
+    npy_uintp *ians, *iweights;
+    double *weights = NULL, *dans;
 
     NPY_PREPARE_ARGPARSER;
     if (npy_parse_arguments("bincount", args, len_args, kwnames,
@@ -183,11 +184,11 @@ arr_bincount(PyObject *NPY_UNUSED(self), PyObject *const *args,
         }
     }
     if (weight == Py_None) {
-        ans = (PyArrayObject *)PyArray_ZEROS(1, &ans_size, NPY_INTP, 0);
+        ans = (PyArrayObject *)PyArray_ZEROS(1, &ans_size, NPY_UINTP, 0);
         if (ans == NULL) {
             goto fail;
         }
-        ians = (npy_intp *)PyArray_DATA(ans);
+        ians = (npy_uintp *)PyArray_DATA(ans);
         NPY_BEGIN_ALLOW_THREADS;
         for (i = 0; i < len; i++)
             ians[numbers[i]] += 1;
@@ -195,27 +196,60 @@ arr_bincount(PyObject *NPY_UNUSED(self), PyObject *const *args,
         Py_DECREF(lst);
     }
     else {
-        wts = (PyArrayObject *)PyArray_ContiguousFromAny(
-                                                weight, NPY_DOUBLE, 1, 1);
+        wts = (PyArrayObject *)PyArray_FromAny(
+            weight, NULL, 1, 1, NPY_ARRAY_DEFAULT, NULL);
         if (wts == NULL) {
             goto fail;
         }
-        weights = (double *)PyArray_DATA(wts);
         if (PyArray_SIZE(wts) != len) {
             PyErr_SetString(PyExc_ValueError,
                     "The weights and list don't have the same length.");
             goto fail;
         }
-        ans = (PyArrayObject *)PyArray_ZEROS(1, &ans_size, NPY_DOUBLE, 0);
-        if (ans == NULL) {
+        if (PyArray_ISINTEGER(wts)) {
+            iweights = (npy_uintp *)PyArray_DATA(wts);
+            ans = (PyArrayObject *)PyArray_ZEROS(1, &ans_size, NPY_UINTP, 0);
+            if (ans == NULL) {
+                goto fail;
+            }
+            ians = (npy_uintp *)PyArray_DATA(ans);
+            NPY_BEGIN_ALLOW_THREADS;
+            for (i = 0; i < len; i++) {
+                ians[numbers[i]] += iweights[i];
+            }
+            NPY_END_ALLOW_THREADS;
+        } else if (PyArray_ISFLOAT(wts)) {
+            weights = (double *)PyArray_DATA(wts);
+            ans = (PyArrayObject *)PyArray_ZEROS(1, &ans_size, NPY_DOUBLE, 0);
+            if (ans == NULL) {
+                goto fail;
+            }
+            dans = (double *)PyArray_DATA(ans);
+            NPY_BEGIN_ALLOW_THREADS;
+            for (i = 0; i < len; i++) {
+                dans[numbers[i]] += weights[i];
+            }
+            NPY_END_ALLOW_THREADS;
+        } else if (PyArray_ISCOMPLEX(wts)) {
+            weights = (double *)PyArray_DATA(wts);
+            ans = (PyArrayObject *)PyArray_ZEROS(1, &ans_size, NPY_CDOUBLE, 0);
+            if (ans == NULL) {
+                goto fail;
+            }
+            dans = (double *)PyArray_DATA(ans);
+            NPY_BEGIN_ALLOW_THREADS;
+            for (i = 0; i < len; i++) {
+                /* Add real parts */
+                dans[2 * numbers[i]] += weights[2 * i];
+                /* Add complex parts */
+                dans[2 * numbers[i] + 1] += weights[2 * i + 1];
+            }
+            NPY_END_ALLOW_THREADS;
+        } else {
+            PyErr_SetString(PyExc_TypeError,
+                    "The weights array must only contain floats or complex numbers.");
             goto fail;
         }
-        dans = (double *)PyArray_DATA(ans);
-        NPY_BEGIN_ALLOW_THREADS;
-        for (i = 0; i < len; i++) {
-            dans[numbers[i]] += weights[i];
-        }
-        NPY_END_ALLOW_THREADS;
         Py_DECREF(lst);
         Py_DECREF(wts);
     }
