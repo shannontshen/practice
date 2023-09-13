@@ -29,17 +29,17 @@ def run():
 
     try:
         import numpy
-        has_newnumpy = 1
-    except ImportError as e:
-        print('Failed to import new numpy:', e)
-        has_newnumpy = 0
+        has_newnumpy = True
+    except ImportError:
+        print('Failed to import new numpy:', sys.exc_info()[1])
+        has_newnumpy = False
 
     try:
-        from numpy.f2py import f2py2e
-        has_f2py2e = 1
-    except ImportError as e:
-        print('Failed to import f2py2e:', e)
-        has_f2py2e = 0
+        from numpy.f2py import f2pyarg
+        has_f2pyarg = True
+    except ImportError:
+        print('Failed to import f2pyarg:', sys.exc_info()[1])
+        has_f2pyarg = False
 
     try:
         import numpy.distutils
@@ -60,10 +60,10 @@ def run():
             print('error:', msg)
             print('------')
 
-    if has_f2py2e:
+    if has_f2pyarg:
         try:
-            print('Found f2py2e version %r in %s' %
-                  (f2py2e.__version__.version, f2py2e.__file__))
+            print('Found f2pyarg version %r in %s' %
+                  (f2pyarg.__version__.version, f2pyarg.__file__))
         except Exception as msg:
             print('error:', msg)
             print('------')

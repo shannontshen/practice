@@ -16,7 +16,7 @@ f2py_version = __version__.version
 
 import copy
 import re
-import os
+from pathlib import Path
 from .crackfortran import markoutercomma
 from . import cb_rules
 from ._isocbind import iso_c_binding_map
@@ -143,9 +143,10 @@ def load_f2cmap_file(f2cmap_file):
 
     if f2cmap_file is None:
         # Default value
-        f2cmap_file = '.f2py_f2cmap'
-        if not os.path.isfile(f2cmap_file):
-            return
+        f2cmap_file = Path.cwd() / Path('.f2py_f2cmap')
+    f2cmap_file = Path(f2cmap_file)
+    if not f2cmap_file.is_file():
+        return
 
     # User defined additions to f2cmap_all.
     # f2cmap_file must contain a dictionary of dictionaries, only. For
@@ -153,8 +154,8 @@ def load_f2cmap_file(f2cmap_file):
     # interpreted as C 'float'. This feature is useful for F90/95 users if
     # they use PARAMETERS in type specifications.
     try:
-        outmess('Reading f2cmap from {!r} ...\n'.format(f2cmap_file))
-        with open(f2cmap_file) as f:
+        outmess('Reading f2cmap from {!r} ...\n'.format(f2cmap_file.name))
+        with open(f2cmap_file, 'r') as f:
             d = eval(f.read().lower(), {}, {})
         for k, d1 in d.items():
             for k1 in d1.keys():
@@ -247,7 +248,7 @@ def getctype(var):
                     except KeyError:
                         errmess('getctype: "%s(kind=%s)" is mapped to C "%s" (to override define dict(%s = dict(%s="<C typespec>")) in %s/.f2py_f2cmap file).\n'
                                 % (typespec, var['kindselector']['kind'], ctype,
-                                   typespec, var['kindselector']['kind'], os.getcwd()))
+                                   typespec, var['kindselector']['kind'], Path.cwd()))
     else:
         if not isexternal(var):
             errmess('getctype: No C-type found in "%s", assuming void.\n' % var)

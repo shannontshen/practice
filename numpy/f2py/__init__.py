@@ -2,17 +2,14 @@
 """Fortran to Python Interface Generator.
 
 """
-__all__ = ['run_main', 'compile', 'get_include']
+__all__ = ['main', 'compile', 'get_include']
 
 import sys
 import subprocess
 import os
 
-from . import f2py2e
 from . import diagnose
-
-run_main = f2py2e.run_main
-main = f2py2e.main
+from numpy.f2py.f2pyarg import main
 
 
 def compile(source,
@@ -102,7 +99,7 @@ def compile(source,
 
         c = [sys.executable,
              '-c',
-             'import numpy.f2py as f2py2e;f2py2e.main()'] + args
+             'from numpy.f2py import main;main()'] + args
         try:
             cp = subprocess.run(c, capture_output=True)
         except OSError:
