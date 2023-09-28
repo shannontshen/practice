@@ -5301,6 +5301,26 @@ class TestIO:
         d = np.fromstring("1,2", sep=",", dtype=np.int64, count=0)
         assert d.shape == (0,)
 
+    def test_fromstring_no_whitespace(self):
+        d = np.fromstring("0, ", sep=',', whitespace="")
+        assert_array_equal(d, [0])
+    
+    def test_fromstring_empty(self):
+        d = np.fromstring(" ", whitespace = 1)
+        assert d.shape == (1,)
+    
+    def test_fromstring_empty2(self):
+        d = np.fromstring("1, ,3 ", sep = ",", whitespace = 2)
+        assert_array_equal(d, [1, 2, 3])
+
+    def test_fromstring_empty3(self):
+        d = np.fromstring(" ", sep = ",", whitespace = 3)
+        assert d.shape == (3,)
+
+    def test_fromstring_empty4(self):
+        d = np.fromstring("1, 3, 5, 6 ", sep = ",", whitespace = 6)
+        assert_array_equal(d, [1, 3, 5, 6])
+
     def test_empty_files_text(self, tmp_filename):
         with open(tmp_filename, 'w') as f:
             pass
