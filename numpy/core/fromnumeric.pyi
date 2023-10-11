@@ -273,6 +273,23 @@ def argmin(
 ) -> _ArrayType: ...
 
 @overload
+def topk(
+    a: ArrayLike,
+    k: int = ...,
+    axis: None = ...,
+    largest: Optional[bool] = ...,
+    sorted: Optional[bool] = ...,
+) -> Tuple[ndarray, ndarray]: ...
+@overload
+def topk(
+    a: ArrayLike,
+    k: int = ...,
+    axis: Optional[int] = ...,
+    largest: Optional[bool] = ...,
+    sorted: Optional[bool] = ...,
+) -> Tuple[ndarray, ndarray]: ...
+
+@overload
 def searchsorted(
     a: ArrayLike,
     v: _ScalarLike_co,
