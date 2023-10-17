@@ -371,6 +371,75 @@ class TestRecord:
                        'offsets': [0]}, align=True)
         assert_equal(dt.alignment, 1)
 
+    def test_record_base_type_alignment(self):
+        int16_alignment = np.dtype(np.int16).alignment
+
+        dt = np.dtype(
+            (np.record, []),
+            align = True)
+        assert_equal(dt.alignment, 1)
+
+        dt = np.dtype(
+            (np.record, 
+             [('e1', np.int16), ('e2', np.int16)]),
+            align = True)
+        assert_equal(dt.alignment, int16_alignment)
+        assert_equal(dt['e1'].alignment, int16_alignment)
+        assert_equal(dt['e2'].alignment, int16_alignment)
+
+        short_alignment = np.dtype(np.short).alignment
+        byte_alignment = np.dtype(np.byte).alignment
+        float16_alignment = np.dtype(np.float16).alignment
+        longdouble_alignment = np.dtype(np.longdouble).alignment
+        timedelta64_alignment = np.dtype(np.timedelta64).alignment
+        void_alignment = np.dtype(np.void).alignment
+        max_alignment = max(
+            short_alignment, byte_alignment,
+            float16_alignment, longdouble_alignment,
+            timedelta64_alignment, void_alignment)
+
+        dt = np.dtype(
+            (np.record, 
+             [('e1', np.short),
+              ('e2', np.byte),
+              ('e3', np.float16),
+              ('e4', np.longdouble),
+              ('e5', np.timedelta64),
+              ('e6', np.void)]),
+            align = True)
+        assert_equal(dt.alignment, max_alignment)
+        assert_equal(dt['e1'].alignment, short_alignment)
+        assert_equal(dt['e2'].alignment, byte_alignment)
+        assert_equal(dt['e3'].alignment, float16_alignment)
+        assert_equal(dt['e4'].alignment, longdouble_alignment)
+        assert_equal(dt['e5'].alignment, timedelta64_alignment)
+        assert_equal(dt['e6'].alignment, void_alignment)
+        
+        longlong_alignment = np.dtype(np.longlong).alignment
+        int64_alignment = np.dtype(np.int64).alignment
+        datetime64_alignment = np.dtype(np.datetime64).alignment
+        max_alignment = max(
+            longdouble_alignment, longlong_alignment,
+            int64_alignment, datetime64_alignment,
+            short_alignment
+        )
+        dt = np.dtype(
+            (np.record, 
+             [
+                 ('e1', np.longdouble),
+                 ('e2', np.longlong),
+                 ('e3', np.int64),
+                 ('e4', np.datetime64),
+                 ('e5', np.short)
+                ]),
+            align = True)
+        assert_equal(dt.alignment, max_alignment)
+        assert_equal(dt['e1'].alignment, longdouble_alignment)
+        assert_equal(dt['e2'].alignment, longlong_alignment)
+        assert_equal(dt['e3'].alignment, int64_alignment)
+        assert_equal(dt['e4'].alignment, datetime64_alignment)
+        assert_equal(dt['e5'].alignment, short_alignment)
+
     def test_union_struct(self):
         # Should be able to create union dtypes
         dt = np.dtype({'names':['f0', 'f1', 'f2'], 'formats':['<u4', '<u2', '<u2'],
@@ -1177,6 +1246,61 @@ class TestDtypeAttributes:
         assert arr.strides == (0,)
         with pytest.raises(ValueError):
             arr.dtype = "i1"
+
+    def test_alignment_dtype_baseclass(self):
+        int16_alignment = np.dtype(np.int16).alignment
+
+        dtype = np.dtype(
+            (np.int32, {'e1': (np.int16, 0), 'e2': (np.int16, 2)}),
+            align = True)
+        assert_equal(dtype.alignment, int16_alignment)
+        assert_equal(dtype['e1'].alignment, int16_alignment)
+        assert_equal(dtype['e2'].alignment, int16_alignment)
+
+        timedelta64_alignment = np.dtype(np.timedelta64).alignment
+        longdouble_alignment = np.dtype(np.longdouble).alignment
+        max_alignment = max(
+            timedelta64_alignment, longdouble_alignment)
+        
+        dtype = np.dtype(
+            (np.void, [('e1', np.timedelta64), ('e2', np.longdouble)]),
+            align = True)
+        assert_equal(dtype.alignment, max_alignment)
+        assert_equal(dtype['e1'].alignment, timedelta64_alignment)
+        assert_equal(dtype['e2'].alignment, longdouble_alignment)
+
+        int8_alignment = np.dtype(np.int8).alignment
+        max_alignment = max(
+            int16_alignment, int8_alignment)
+        
+        dtype = np.dtype(
+            (np.longlong,
+             [
+                 ('e1', np.int16),
+                 ('e2', np.int16),
+                 ('e3', np.int8),
+                 ('e4', np.int8),
+                 ('e5', np.int8),
+                 ('e6', np.int8)
+            ]), align = True)
+        assert_equal(dtype.alignment, int16_alignment)
+        assert_equal(dtype['e1'].alignment, int16_alignment)
+        assert_equal(dtype['e2'].alignment, int16_alignment)
+        assert_equal(dtype['e3'].alignment, int8_alignment)
+        assert_equal(dtype['e4'].alignment, int8_alignment)
+        assert_equal(dtype['e5'].alignment, int8_alignment)
+        assert_equal(dtype['e6'].alignment, int8_alignment)
+
+        u2_alignment = np.dtype('u2').alignment
+        u4_alignment = np.dtype('u4').alignment
+        max_alignment = max(u2_alignment, u4_alignment)
+
+        dtype = np.dtype(
+            ('u8', {'e1': ('u2', 0), 'e2': ('u4', 4)}),
+            align = True)
+        assert_equal(dtype.alignment, max_alignment)
+        assert_equal(dtype['e1'].alignment, u2_alignment)
+        assert_equal(dtype['e2'].alignment, u4_alignment)
 
 class TestDTypeMakeCanonical:
     def check_canonical(self, dtype, canonical):
