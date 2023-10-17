@@ -7,7 +7,7 @@ import itertools
 import operator
 
 from numpy.core.multiarray import c_einsum, matmul
-from numpy.core.numeric import asanyarray
+from numpy.core.numeric import asanyarray, reshape
 from numpy.core.umath import multiply
 from numpy.core.overrides import array_function_dispatch
 
@@ -885,7 +885,7 @@ def _parse_eq_to_pure_multiplication(a_term, shape_a, b_term, shape_b, out):
 
     No need to cache this as it is within the cached
     ``_parse_eq_to_batch_matmul``.
-    
+
     """
     desired_a = ""
     desired_b = ""
@@ -1142,14 +1142,14 @@ def bmm_einsum(eq, a, b, out=None, **kwargs):
         # diagonals, sums, and tranpose
         a = c_einsum(eq_a, a)
     if new_shape_a is not None:
-        a = a.reshape(new_shape_a)
+        a = reshape(a, new_shape_a)
 
     # prepare right
     if eq_b is not None:
         # diagonals, sums, and tranpose
         b = c_einsum(eq_b, b)
     if new_shape_b is not None:
-        b = b.reshape(new_shape_b)
+        b = reshape(b, new_shape_b)
 
     if pure_multiplication:
         # no contracted indices
@@ -1169,7 +1169,7 @@ def bmm_einsum(eq, a, b, out=None, **kwargs):
 
     # prepare the output
     if new_shape_ab is not None:
-        ab = ab.reshape(new_shape_ab)
+        ab = reshape(ab, new_shape_ab)
     if perm_ab is not None:
         ab = ab.transpose(perm_ab)
 
