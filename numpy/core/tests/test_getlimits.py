@@ -73,6 +73,15 @@ class TestFinfo:
         f2 = np.finfo(np.float64(1.0))
         assert f1 != f2
 
+    def test_regression_gh23867(self):
+        class NonHashableWithDtype:
+            __hash__ = None
+            dtype = np.dtype('float32')
+  
+        x = NonHashableWithDtype()
+        assert np.finfo(x) == np.finfo(x.dtype)
+        
+
 class TestIinfo:
     def test_basic(self):
         dts = list(zip(['i1', 'i2', 'i4', 'i8',
@@ -85,7 +94,7 @@ class TestIinfo:
         assert_raises(ValueError, iinfo, 'f4')
 
     def test_unsigned_max(self):
-        types = np.sctypes['uint']
+        types = np.core.sctypes['uint']
         for T in types:
             with np.errstate(over="ignore"):
                 max_calculated = T(0) - T(1)
@@ -178,7 +187,7 @@ def test_subnormal_warning():
 
 def test_plausible_finfo():
     # Assert that finfo returns reasonable results for all types
-    for ftype in np.sctypes['float'] + np.sctypes['complex']:
+    for ftype in np.core.sctypes['float'] + np.core.sctypes['complex']:
         info = np.finfo(ftype)
         assert_(info.nmant > 1)
         assert_(info.minexp < -1)

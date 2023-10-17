@@ -11,13 +11,14 @@ from functools import reduce
 from collections import namedtuple
 
 import numpy.core.umath as ncu
-from numpy.core import _umath_tests as ncu_tests
+from numpy.core import _umath_tests as ncu_tests, sctypes
 import numpy as np
 from numpy.testing import (
     assert_, assert_equal, assert_raises, assert_raises_regex,
     assert_array_equal, assert_almost_equal, assert_array_almost_equal,
     assert_array_max_ulp, assert_allclose, assert_no_warnings, suppress_warnings,
-    _gen_alignment_data, assert_array_almost_equal_nulp, IS_WASM, IS_MUSL
+    _gen_alignment_data, assert_array_almost_equal_nulp, IS_WASM, IS_MUSL, 
+    IS_PYPY
     )
 from numpy.testing._private.utils import _glibc_older_than
 
@@ -266,8 +267,8 @@ class TestOut:
 class TestComparisons:
     import operator
 
-    @pytest.mark.parametrize('dtype', np.sctypes['uint'] + np.sctypes['int'] +
-                             np.sctypes['float'] + [np.bool_])
+    @pytest.mark.parametrize('dtype', sctypes['uint'] + sctypes['int'] +
+                             sctypes['float'] + [np.bool_])
     @pytest.mark.parametrize('py_comp,np_comp', [
         (operator.lt, np.less),
         (operator.le, np.less_equal),
@@ -369,6 +370,64 @@ class TestComparisons:
         with pytest.raises(TypeError, match="No loop matching"):
             np.equal(1, 1, sig=(None, None, "l"))
 
+    @pytest.mark.parametrize("dtypes", ["qQ", "Qq"])
+    @pytest.mark.parametrize('py_comp, np_comp', [
+        (operator.lt, np.less),
+        (operator.le, np.less_equal),
+        (operator.gt, np.greater),
+        (operator.ge, np.greater_equal),
+        (operator.eq, np.equal),
+        (operator.ne, np.not_equal)
+    ])
+    @pytest.mark.parametrize("vals", [(2**60, 2**60+1), (2**60+1, 2**60)])
+    def test_large_integer_direct_comparison(
+            self, dtypes, py_comp, np_comp, vals):
+        # Note that float(2**60) + 1 == float(2**60).
+        a1 = np.array([2**60], dtype=dtypes[0])
+        a2 = np.array([2**60 + 1], dtype=dtypes[1])
+        expected = py_comp(2**60, 2**60+1)
+
+        assert py_comp(a1, a2) == expected
+        assert np_comp(a1, a2) == expected
+        # Also check the scalars:
+        s1 = a1[0]
+        s2 = a2[0]
+        assert isinstance(s1, np.integer)
+        assert isinstance(s2, np.integer)
+        # The Python operator here is mainly interesting:
+        assert py_comp(s1, s2) == expected
+        assert np_comp(s1, s2) == expected
+
+    @pytest.mark.parametrize("dtype", np.typecodes['UnsignedInteger'])
+    @pytest.mark.parametrize('py_comp_func, np_comp_func', [
+        (operator.lt, np.less),
+        (operator.le, np.less_equal),
+        (operator.gt, np.greater),
+        (operator.ge, np.greater_equal),
+        (operator.eq, np.equal),
+        (operator.ne, np.not_equal)
+    ])
+    @pytest.mark.parametrize("flip", [True, False])
+    def test_unsigned_signed_direct_comparison(
+            self, dtype, py_comp_func, np_comp_func, flip):
+        if flip:
+            py_comp = lambda x, y: py_comp_func(y, x)
+            np_comp = lambda x, y: np_comp_func(y, x)
+        else:
+            py_comp = py_comp_func
+            np_comp = np_comp_func
+
+        arr = np.array([np.iinfo(dtype).max], dtype=dtype)
+        expected = py_comp(int(arr[0]), -1)
+
+        assert py_comp(arr, -1) == expected
+        assert np_comp(arr, -1) == expected
+        scalar = arr[0]
+        assert isinstance(scalar, np.integer)
+        # The Python operator here is mainly interesting:
+        assert py_comp(scalar, -1) == expected
+        assert np_comp(scalar, -1) == expected
+
 
 class TestAdd:
     def test_reduce_alignment(self):
@@ -395,7 +454,7 @@ class TestDivision:
 
     @pytest.mark.skipif(IS_WASM, reason="fp errors don't work in wasm")
     @pytest.mark.parametrize("dtype,ex_val", itertools.product(
-        np.sctypes['int'] + np.sctypes['uint'], (
+        sctypes['int'] + sctypes['uint'], (
             (
                 # dividend
                 "np.array(range(fo.max-lsize, fo.max)).astype(dtype),"
@@ -481,7 +540,7 @@ class TestDivision:
 
     @pytest.mark.skipif(IS_WASM, reason="fp errors don't work in wasm")
     @pytest.mark.parametrize("dtype,ex_val", itertools.product(
-        np.sctypes['int'] + np.sctypes['uint'], (
+        sctypes['int'] + sctypes['uint'], (
             "np.array([fo.max, 1, 2, 1, 1, 2, 3], dtype=dtype)",
             "np.array([fo.min, 1, -2, 1, 1, 2, -3]).astype(dtype)",
             "np.arange(fo.min, fo.min+(100*10), 10, dtype=dtype)",
@@ -927,10 +986,8 @@ class TestDivisionIntegerOverflowsAndDivideByZero:
             assert extractor(res2) == 0
 
     @pytest.mark.skipif(IS_WASM, reason="fp errors don't work in wasm")
-    @pytest.mark.parametrize("dividend_dtype",
-            np.sctypes['int'])
-    @pytest.mark.parametrize("divisor_dtype",
-            np.sctypes['int'])
+    @pytest.mark.parametrize("dividend_dtype", sctypes['int'])
+    @pytest.mark.parametrize("divisor_dtype", sctypes['int'])
     @pytest.mark.parametrize("operation",
             [np.remainder, np.fmod, np.divmod, np.floor_divide,
              operator.mod, operator.floordiv])
@@ -1056,7 +1113,7 @@ class TestPower:
             assert_array_equal(x.imag, y.imag)
 
         for z in [complex(0, np.inf), complex(1, np.inf)]:
-            z = np.array([z], dtype=np.complex_)
+            z = np.array([z], dtype=np.complex128)
             with np.errstate(invalid="ignore"):
                 assert_complex_equal(z**1, z)
                 assert_complex_equal(z**2, z*z)
@@ -1426,23 +1483,50 @@ class TestSpecialFloats:
             np.log(a)
 
     @pytest.mark.skipif(IS_WASM, reason="fp errors don't work in wasm")
-    def test_sincos_values(self):
+    @pytest.mark.parametrize('dtype', ['e', 'f', 'd', 'g'])
+    def test_sincos_values(self, dtype):
         with np.errstate(all='ignore'):
             x = [np.nan, np.nan, np.nan, np.nan]
             y = [np.nan, -np.nan, np.inf, -np.inf]
-            for dt in ['e', 'f', 'd', 'g']:
-                xf = np.array(x, dtype=dt)
-                yf = np.array(y, dtype=dt)
-                assert_equal(np.sin(yf), xf)
-                assert_equal(np.cos(yf), xf)
+            xf = np.array(x, dtype=dtype)
+            yf = np.array(y, dtype=dtype)
+            assert_equal(np.sin(yf), xf)
+            assert_equal(np.cos(yf), xf)
 
+    @pytest.mark.skipif(IS_WASM, reason="fp errors don't work in wasm")
+    @pytest.mark.xfail(
+        sys.platform.startswith("darwin"),
+        reason="underflow is triggered for scalar 'sin'"
+    )
+    def test_sincos_underflow(self):
+        with np.errstate(under='raise'):
+            underflow_trigger = np.array(
+                float.fromhex("0x1.f37f47a03f82ap-511"),
+                dtype=np.float64
+            )
+            np.sin(underflow_trigger)
+            np.cos(underflow_trigger)
 
+    @pytest.mark.skipif(IS_WASM, reason="fp errors don't work in wasm")
+    @pytest.mark.parametrize('callable', [np.sin, np.cos])
+    @pytest.mark.parametrize('dtype', ['e', 'f', 'd'])
+    @pytest.mark.parametrize('value', [np.inf, -np.inf])
+    def test_sincos_errors(self, callable, dtype, value):
         with np.errstate(invalid='raise'):
-            for callable in [np.sin, np.cos]:
-                for value in [np.inf, -np.inf]:
-                    for dt in ['e', 'f', 'd']:
-                        assert_raises(FloatingPointError, callable,
-                                np.array([value], dtype=dt))
+            assert_raises(FloatingPointError, callable,
+                np.array([value], dtype=dtype))
+
+    @pytest.mark.parametrize('callable', [np.sin, np.cos])
+    @pytest.mark.parametrize('dtype', ['f', 'd'])
+    @pytest.mark.parametrize('stride', [-1, 1, 2, 4, 5])
+    def test_sincos_overlaps(self, callable, dtype, stride):
+        N = 100
+        M = N // abs(stride)
+        rng = np.random.default_rng(42)
+        x = rng.standard_normal(N, dtype)
+        y = callable(x[::stride])
+        callable(x[::stride], out=x[:M])
+        assert_equal(x[:M], y)
 
     @pytest.mark.parametrize('dt', ['e', 'f', 'd', 'g'])
     def test_sqrt_values(self, dt):
@@ -1561,6 +1645,8 @@ class TestSpecialFloats:
                           np.array(1200.0, dtype='d'))
 
     @pytest.mark.skipif(IS_WASM, reason="fp errors don't work in wasm")
+    @pytest.mark.skipif('bsd' in sys.platform,
+            reason="fallback implementation may not raise, see gh-2487")
     def test_cosh(self):
         in_ = [np.nan, -np.nan, np.inf, -np.inf]
         out = [np.nan, np.nan, np.inf, np.inf]
@@ -2063,38 +2149,38 @@ class TestArctan2SpecialValues:
 
     def test_zero_nzero(self):
         # atan2(+-0, -0) returns +-pi.
-        assert_almost_equal(ncu.arctan2(np.PZERO, np.NZERO), np.pi)
-        assert_almost_equal(ncu.arctan2(np.NZERO, np.NZERO), -np.pi)
+        assert_almost_equal(ncu.arctan2(ncu.PZERO, ncu.NZERO), np.pi)
+        assert_almost_equal(ncu.arctan2(ncu.NZERO, ncu.NZERO), -np.pi)
 
     def test_zero_pzero(self):
         # atan2(+-0, +0) returns +-0.
-        assert_arctan2_ispzero(np.PZERO, np.PZERO)
-        assert_arctan2_isnzero(np.NZERO, np.PZERO)
+        assert_arctan2_ispzero(ncu.PZERO, ncu.PZERO)
+        assert_arctan2_isnzero(ncu.NZERO, ncu.PZERO)
 
     def test_zero_negative(self):
         # atan2(+-0, x) returns +-pi for x < 0.
-        assert_almost_equal(ncu.arctan2(np.PZERO, -1), np.pi)
-        assert_almost_equal(ncu.arctan2(np.NZERO, -1), -np.pi)
+        assert_almost_equal(ncu.arctan2(ncu.PZERO, -1), np.pi)
+        assert_almost_equal(ncu.arctan2(ncu.NZERO, -1), -np.pi)
 
     def test_zero_positive(self):
         # atan2(+-0, x) returns +-0 for x > 0.
-        assert_arctan2_ispzero(np.PZERO, 1)
-        assert_arctan2_isnzero(np.NZERO, 1)
+        assert_arctan2_ispzero(ncu.PZERO, 1)
+        assert_arctan2_isnzero(ncu.NZERO, 1)
 
     def test_positive_zero(self):
         # atan2(y, +-0) returns +pi/2 for y > 0.
-        assert_almost_equal(ncu.arctan2(1, np.PZERO), 0.5 * np.pi)
-        assert_almost_equal(ncu.arctan2(1, np.NZERO), 0.5 * np.pi)
+        assert_almost_equal(ncu.arctan2(1, ncu.PZERO), 0.5 * np.pi)
+        assert_almost_equal(ncu.arctan2(1, ncu.NZERO), 0.5 * np.pi)
 
     def test_negative_zero(self):
         # atan2(y, +-0) returns -pi/2 for y < 0.
-        assert_almost_equal(ncu.arctan2(-1, np.PZERO), -0.5 * np.pi)
-        assert_almost_equal(ncu.arctan2(-1, np.NZERO), -0.5 * np.pi)
+        assert_almost_equal(ncu.arctan2(-1, ncu.PZERO), -0.5 * np.pi)
+        assert_almost_equal(ncu.arctan2(-1, ncu.NZERO), -0.5 * np.pi)
 
     def test_any_ninf(self):
         # atan2(+-y, -infinity) returns +-pi for finite y > 0.
-        assert_almost_equal(ncu.arctan2(1, np.NINF),  np.pi)
-        assert_almost_equal(ncu.arctan2(-1, np.NINF), -np.pi)
+        assert_almost_equal(ncu.arctan2(1, -np.inf),  np.pi)
+        assert_almost_equal(ncu.arctan2(-1, -np.inf), -np.pi)
 
     def test_any_pinf(self):
         # atan2(+-y, +infinity) returns +-0 for finite y > 0.
@@ -2526,7 +2612,15 @@ class TestBool:
 
 class TestBitwiseUFuncs:
 
-    bitwise_types = [np.dtype(c) for c in '?' + 'bBhHiIlLqQ' + 'O']
+    _all_ints_bits = [
+        np.dtype(c).itemsize * 8 for c in np.typecodes["AllInteger"]]
+    bitwise_types = [
+        np.dtype(c) for c in '?' + np.typecodes["AllInteger"] + 'O']
+    bitwise_bits = [
+        2,  # boolean type
+        *_all_ints_bits,  # All integers
+        max(_all_ints_bits) + 1,  # Object_ type
+    ]
 
     def test_values(self):
         for dt in self.bitwise_types:
@@ -2606,6 +2700,30 @@ class TestBitwiseUFuncs:
             msg = "dt: '%s'" % (f,)
             btype = np.array([True], dtype=object)
             assert_(type(f.reduce(btype)) is bool, msg)
+
+    @pytest.mark.parametrize("input_dtype_obj, bitsize",
+            zip(bitwise_types, bitwise_bits))
+    def test_bitwise_count(self, input_dtype_obj, bitsize):
+        input_dtype = input_dtype_obj.type
+
+        # bitwise_count is only in-built in 3.10+
+        if sys.version_info < (3, 10) and input_dtype == np.object_:
+            pytest.skip("Required Python >=3.10")
+
+        for i in range(1, bitsize):
+            num = 2**i - 1
+            msg = f"bitwise_count for {num}"
+            assert i == np.bitwise_count(input_dtype(num)), msg
+            if np.issubdtype(
+                input_dtype, np.signedinteger) or input_dtype == np.object_:
+                assert i == np.bitwise_count(input_dtype(-num)), msg
+
+        a = np.array([2**i-1 for i in range(1, bitsize)], dtype=input_dtype)
+        bitwise_count_a = np.bitwise_count(a)
+        expected = np.arange(1, bitsize, dtype=input_dtype)
+
+        msg = f"array bitwise_count for {input_dtype}"
+        assert all(bitwise_count_a == expected), msg
 
 
 class TestInt:
@@ -3831,6 +3949,19 @@ class TestSpecialMethods:
         assert_equal(a, check)
         assert_(a.info, {'inputs': [0, 2]})
 
+    def test_array_ufunc_direct_call(self):
+        # This is mainly a regression test for gh-24023 (shouldn't segfault)
+        a = np.array(1)
+        with pytest.raises(TypeError):
+            a.__array_ufunc__()
+
+        # No kwargs means kwargs may be NULL on the C-level
+        with pytest.raises(TypeError):
+            a.__array_ufunc__(1, 2)
+
+        # And the same with a valid call:
+        res = a.__array_ufunc__(np.add, "__call__", a, a)
+        assert_array_equal(res, a + a)
 
 class TestChoose:
     def test_mixed(self):
@@ -4071,13 +4202,23 @@ class TestComplexFunctions:
             except AttributeError:
                 continue
             for p in points:
-                a = complex(func(np.complex_(p)))
+                a = complex(func(np.complex128(p)))
                 b = cfunc(p)
-                assert_(abs(a - b) < atol, "%s %s: %s; cmath: %s" % (fname, p, a, b))
+                assert_(
+                    abs(a - b) < atol, 
+                    "%s %s: %s; cmath: %s" % (fname, p, a, b)
+                )
 
+    @pytest.mark.xfail(
+        # manylinux2014 uses glibc2.17
+        _glibc_older_than("2.18"),
+        reason="Older glibc versions are imprecise (maybe passes with SIMD?)"
+    )
     @pytest.mark.xfail(IS_MUSL, reason="gh23049")
     @pytest.mark.xfail(IS_WASM, reason="doesn't work")
-    @pytest.mark.parametrize('dtype', [np.complex64, np.complex_, np.longcomplex])
+    @pytest.mark.parametrize('dtype', [
+        np.complex64, np.complex128, np.clongdouble
+    ])
     def test_loss_of_precision(self, dtype):
         """Check loss of precision in complex arc* functions"""
 
@@ -4116,9 +4257,9 @@ class TestComplexFunctions:
         x_series = np.logspace(-20, -3.001, 200)
         x_basic = np.logspace(-2.999, 0, 10, endpoint=False)
 
-        if dtype is np.longcomplex:
+        if dtype is np.clongdouble:
             if bad_arcsinh():
-                pytest.skip("Trig functions of np.longcomplex values known "
+                pytest.skip("Trig functions of np.clongdouble values known "
                             "to be inaccurate on aarch64 and PPC for some "
                             "compilation configurations.")
             # It's not guaranteed that the system-provided arc functions
@@ -4283,14 +4424,14 @@ def _check_branch_cut(f, x0, dx, re_sign=1, im_sign=-1, sig_zero_ok=False,
         ji = (x0.imag == 0) & (dx.imag != 0)
         if np.any(jr):
             x = x0[jr]
-            x.real = np.NZERO
+            x.real = ncu.NZERO
             ym = f(x)
             assert_(np.all(np.absolute(y0[jr].real - ym.real*re_sign) < atol), (y0[jr], ym))
             assert_(np.all(np.absolute(y0[jr].imag - ym.imag*im_sign) < atol), (y0[jr], ym))
 
         if np.any(ji):
             x = x0[ji]
-            x.imag = np.NZERO
+            x.imag = ncu.NZERO
             ym = f(x)
             assert_(np.all(np.absolute(y0[ji].real - ym.real*re_sign) < atol), (y0[ji], ym))
             assert_(np.all(np.absolute(y0[ji].imag - ym.imag*im_sign) < atol), (y0[ji], ym))
@@ -4331,7 +4472,7 @@ def test_nextafterl():
 
 
 def test_nextafter_0():
-    for t, direction in itertools.product(np.sctypes['float'], (1, -1)):
+    for t, direction in itertools.product(np.core.sctypes['float'], (1, -1)):
         # The value of tiny for double double is NaN, so we need to pass the
         # assert
         with suppress_warnings() as sup:
@@ -4435,7 +4576,7 @@ def test_reduceat():
     # test no buffer
     np.setbufsize(32)
     h1 = np.add.reduceat(a['value'], indx)
-    np.setbufsize(np.UFUNC_BUFSIZE_DEFAULT)
+    np.setbufsize(ncu.UFUNC_BUFSIZE_DEFAULT)
     assert_array_almost_equal(h1, h2)
 
 def test_reduceat_empty():
@@ -4613,3 +4754,41 @@ def test_bad_legacy_gufunc_silent_errors(x1):
     # The signature of always_error_gufunc is '(i),()->()'.
     with pytest.raises(RuntimeError, match=r"How unexpected :\)!"):
         ncu_tests.always_error_gufunc(x1, 0.0)
+
+
+class TestAddDocstring:
+    @pytest.mark.skipif(sys.flags.optimize == 2, reason="Python running -OO")
+    @pytest.mark.skipif(IS_PYPY, reason="PyPy does not modify tp_doc")
+    def test_add_same_docstring(self):
+        # test for attributes (which are C-level defined)
+        ncu.add_docstring(np.ndarray.flat, np.ndarray.flat.__doc__)
+
+        # And typical functions:
+        def func():
+            """docstring"""
+            return
+
+        ncu.add_docstring(func, func.__doc__)
+
+    @pytest.mark.skipif(sys.flags.optimize == 2, reason="Python running -OO")
+    def test_different_docstring_fails(self):
+        # test for attributes (which are C-level defined)
+        with assert_raises(RuntimeError):
+            ncu.add_docstring(np.ndarray.flat, "different docstring")
+            
+        # And typical functions:
+        def func():
+            """docstring"""
+            return
+
+        with assert_raises(RuntimeError):
+            ncu.add_docstring(func, "different docstring")
+
+
+class TestAdd_newdoc_ufunc:
+    def test_ufunc_arg(self):
+        assert_raises(TypeError, ncu._add_newdoc_ufunc, 2, "blah")
+        assert_raises(ValueError, ncu._add_newdoc_ufunc, np.add, "blah")
+
+    def test_string_arg(self):
+        assert_raises(TypeError, ncu._add_newdoc_ufunc, np.add, 3)

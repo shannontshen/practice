@@ -55,9 +55,6 @@ PyArray_DTypeFromObject(PyObject *obj, int maxdims,
 NPY_NO_EXPORT PyArray_Descr *
 _array_find_python_scalar_type(PyObject *op);
 
-NPY_NO_EXPORT int
-_zerofill(PyArrayObject *ret);
-
 NPY_NO_EXPORT npy_bool
 _IsWriteable(PyArrayObject *ap);
 
@@ -178,7 +175,7 @@ check_and_adjust_axis(int *axis, int ndim)
 }
 
 /* used for some alignment checks */
-/* 
+/*
  * GCC releases before GCC 4.9 had a bug in _Alignof.  See GCC bug 52023
  * <https://gcc.gnu.org/bugzilla/show_bug.cgi?id=52023>.
  * clang versions < 8.0.0 have the same bug.
@@ -187,11 +184,11 @@ check_and_adjust_axis(int *axis, int ndim)
      || (defined __GNUC__ && __GNUC__ < 4 + (__GNUC_MINOR__ < 9) \
   && !defined __clang__) \
      || (defined __clang__ && __clang_major__ < 8))
-# define _ALIGN(type) offsetof(struct {char c; type v;}, v)
+# define NPY_ALIGNOF(type) offsetof(struct {char c; type v;}, v)
 #else
-# define _ALIGN(type) _Alignof(type)
+# define NPY_ALIGNOF(type) _Alignof(type)
 #endif
-#define _UINT_ALIGN(type) npy_uint_alignment(sizeof(type))
+#define  NPY_ALIGNOF_UINT(type) npy_uint_alignment(sizeof(type))
 /*
  * Disable harmless compiler warning "4116: unnamed type definition in
  * parentheses" which is caused by the _ALIGN macro.
@@ -226,20 +223,20 @@ npy_uint_alignment(int itemsize)
         case 1:
             return 1;
         case 2:
-            alignment = _ALIGN(npy_uint16);
+            alignment = NPY_ALIGNOF(npy_uint16);
             break;
         case 4:
-            alignment = _ALIGN(npy_uint32);
+            alignment = NPY_ALIGNOF(npy_uint32);
             break;
         case 8:
-            alignment = _ALIGN(npy_uint64);
+            alignment = NPY_ALIGNOF(npy_uint64);
             break;
         case 16:
             /*
              * 16 byte types are copied using 2 uint64 assignments.
              * See the strided copy function in lowlevel_strided_loops.c.
              */
-            alignment = _ALIGN(npy_uint64);
+            alignment = NPY_ALIGNOF(npy_uint64);
             break;
         default:
             break;
@@ -334,6 +331,13 @@ PyArray_TupleFromItems(int n, PyObject *const *items, int make_null_none)
     }
     return tuple;
 }
+
+/*
+ * Returns 0 if the array has rank 0, -1 otherwise. Prints a deprecation
+ * warning for arrays of _size_ 1.
+ */
+NPY_NO_EXPORT int
+check_is_convertible_to_scalar(PyArrayObject *v);
 
 
 #include "ucsnarrow.h"

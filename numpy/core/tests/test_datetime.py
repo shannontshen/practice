@@ -1,14 +1,15 @@
+import datetime
+import pickle
+
+import pytest
 
 import numpy
 import numpy as np
-import datetime
-import pytest
 from numpy.testing import (
     IS_WASM,
     assert_, assert_equal, assert_raises, assert_warns, suppress_warnings,
     assert_raises_regex, assert_array_equal,
     )
-from numpy.compat import pickle
 
 # Use pytz to test out various time zones if available
 try:
@@ -239,10 +240,10 @@ class TestDateTime:
         # Some basic strings and repr
         assert_equal(str(np.datetime64('NaT')), 'NaT')
         assert_equal(repr(np.datetime64('NaT')),
-                     "numpy.datetime64('NaT')")
+                     "np.datetime64('NaT')")
         assert_equal(str(np.datetime64('2011-02')), '2011-02')
         assert_equal(repr(np.datetime64('2011-02')),
-                     "numpy.datetime64('2011-02')")
+                     "np.datetime64('2011-02')")
 
         # None gets constructed as NaT
         assert_equal(np.datetime64(None), np.datetime64('NaT'))
@@ -379,12 +380,12 @@ class TestDateTime:
         # Some basic strings and repr
         assert_equal(str(np.timedelta64('NaT')), 'NaT')
         assert_equal(repr(np.timedelta64('NaT')),
-                     "numpy.timedelta64('NaT')")
+                     "np.timedelta64('NaT')")
         assert_equal(str(np.timedelta64(3, 's')), '3 seconds')
         assert_equal(repr(np.timedelta64(-3, 's')),
-                     "numpy.timedelta64(-3,'s')")
+                     "np.timedelta64(-3,'s')")
         assert_equal(repr(np.timedelta64(12)),
-                     "numpy.timedelta64(12)")
+                     "np.timedelta64(12)")
 
         # Construction from an integer produces generic units
         assert_equal(np.timedelta64(12).dtype, np.dtype('m8'))
@@ -730,7 +731,7 @@ class TestDateTime:
         times_swapped = times.astype(times.dtype.newbyteorder())
         assert_array_equal(times, times_swapped)
 
-        unswapped = times_swapped.view(np.int64).newbyteorder()
+        unswapped = times_swapped.view(np.dtype("int64").newbyteorder())
         assert_array_equal(unswapped, times.view(np.int64))
 
     @pytest.mark.parametrize(["time1", "time2"],

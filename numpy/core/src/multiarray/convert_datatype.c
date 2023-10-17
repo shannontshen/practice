@@ -181,6 +181,14 @@ PyArray_GetCastingImpl(PyArray_DTypeMeta *from, PyArray_DTypeMeta *to)
     else if (to->type_num == NPY_VOID) {
         res = PyArray_GetGenericToVoidCastingImpl();
     }
+    /*
+     * Reject non-legacy dtypes. They need to use the new API to add casts and
+     * doing that would have added a cast to the from descriptor's castingimpl
+     * dict
+     */
+    else if (!NPY_DT_is_legacy(from) || !NPY_DT_is_legacy(to)) {
+        Py_RETURN_NONE;
+    }
     else if (from->type_num < NPY_NTYPES && to->type_num < NPY_NTYPES) {
         /* All builtin dtypes have their casts explicitly defined. */
         PyErr_Format(PyExc_RuntimeError,
@@ -189,10 +197,6 @@ PyArray_GetCastingImpl(PyArray_DTypeMeta *from, PyArray_DTypeMeta *to)
         return NULL;
     }
     else {
-        /* Reject non-legacy dtypes (they need to use the new API) */
-        if (!NPY_DT_is_legacy(from) || !NPY_DT_is_legacy(to)) {
-            Py_RETURN_NONE;
-        }
         if (from != to) {
             /* A cast function must have been registered */
             PyArray_VectorUnaryFunc *castfunc = PyArray_GetCastFunc(
@@ -1535,8 +1539,8 @@ static int min_scalar_type_num(char *valueptr, int type_num,
                                             NPY_DOUBLE, is_small_unsigned);
             }
             */
-            if (value.real > -3.4e38 && value.real < 3.4e38 &&
-                     value.imag > -3.4e38 && value.imag < 3.4e38) {
+            if (npy_creal(value) > -3.4e38 && npy_creal(value) < 3.4e38 &&
+                     npy_cimag(value) > -3.4e38 && npy_cimag(value) < 3.4e38) {
                 return NPY_CFLOAT;
             }
             break;
@@ -1549,12 +1553,12 @@ static int min_scalar_type_num(char *valueptr, int type_num,
                                             NPY_LONGDOUBLE, is_small_unsigned);
             }
             */
-            if (value.real > -3.4e38 && value.real < 3.4e38 &&
-                     value.imag > -3.4e38 && value.imag < 3.4e38) {
+            if (npy_creall(value) > -3.4e38 && npy_creall(value) < 3.4e38 &&
+                     npy_cimagl(value) > -3.4e38 && npy_cimagl(value) < 3.4e38) {
                 return NPY_CFLOAT;
             }
-            else if (value.real > -1.7e308 && value.real < 1.7e308 &&
-                     value.imag > -1.7e308 && value.imag < 1.7e308) {
+            else if (npy_creall(value) > -1.7e308 && npy_creall(value) < 1.7e308 &&
+                     npy_cimagl(value) > -1.7e308 && npy_cimagl(value) < 1.7e308) {
                 return NPY_CDOUBLE;
             }
             break;
@@ -2344,10 +2348,12 @@ PyArray_ConvertToCommonType(PyObject *op, int *retn)
         }
 
         mps[i] = (PyArrayObject *)PyArray_FROM_O(tmp);
-        Py_DECREF(tmp);
         if (mps[i] == NULL) {
+            Py_DECREF(tmp);
             goto fail;
         }
+        npy_mark_tmp_array_if_pyscalar(tmp, mps[i], NULL);
+        Py_DECREF(tmp);
     }
 
     common_descr = PyArray_ResultType(n, mps, 0, NULL);
@@ -2757,7 +2763,7 @@ cast_to_string_resolve_descriptors(
      * NOTE: The following code used to be part of PyArray_AdaptFlexibleDType
      *
      * Get a string-size estimate of the input. These
-     * are generallly the size needed, rounded up to
+     * are generally the size needed, rounded up to
      * a multiple of eight.
      */
     npy_intp size = -1;
@@ -3913,21 +3919,6 @@ PyArray_InitializeObjectToObjectCast(void)
 }
 
 
-static int
-PyArray_SetClearFunctions(void)
-{
-    PyArray_DTypeMeta *Object = PyArray_DTypeFromTypeNum(NPY_OBJECT);
-    NPY_DT_SLOTS(Object)->get_clear_loop = &npy_get_clear_object_strided_loop;
-    Py_DECREF(Object);  /* use borrowed */
-
-    PyArray_DTypeMeta *Void = PyArray_DTypeFromTypeNum(NPY_VOID);
-    NPY_DT_SLOTS(Void)->get_clear_loop = &npy_get_clear_void_and_legacy_user_dtype_loop;
-    Py_DECREF(Void);  /* use borrowed */
-    return 0;
-}
-
-
-
 NPY_NO_EXPORT int
 PyArray_InitializeCasts()
 {
@@ -3945,9 +3936,6 @@ PyArray_InitializeCasts()
     }
     /* Datetime casts are defined in datetime.c */
     if (PyArray_InitializeDatetimeCasts() < 0) {
-        return -1;
-    }
-    if (PyArray_SetClearFunctions() < 0) {
         return -1;
     }
     return 0;

@@ -13,10 +13,11 @@ from tempfile import mkstemp, gettempdir
 from urllib.request import urlopen, Request
 from urllib.error import HTTPError
 
-OPENBLAS_V = '0.3.21'
-OPENBLAS_LONG = 'v0.3.21'
-BASE_LOC = 'https://anaconda.org/multibuild-wheels-staging/openblas-libs'
-BASEURL = f'{BASE_LOC}/{OPENBLAS_LONG}/download'
+OPENBLAS_V = '0.3.23.dev'
+OPENBLAS_LONG = 'v0.3.23-293-gc2f4bdbb'
+BASE_LOC = (
+    'https://anaconda.org/scientific-python-nightly-wheels/openblas-libs'
+)
 SUPPORTED_PLATFORMS = [
     'linux-aarch64',
     'linux-x86_64',
@@ -91,7 +92,7 @@ def get_linux(arch):
         return get_musllinux(arch)
 
 
-def download_openblas(target, plat, ilp64):
+def download_openblas(target, plat, ilp64, *, nightly=False):
     osname, arch = plat.split("-")
     fnsuffix = {None: "", "64_": "64_"}[ilp64]
     filename = ''
@@ -101,6 +102,9 @@ def download_openblas(target, plat, ilp64):
     suffix = None
     if osname == "linux":
         suffix = get_linux(arch)
+        typ = 'tar.gz'
+    elif osname == "musllinux":
+        suffix = get_musllinux(arch)
         typ = 'tar.gz'
     elif plat == 'macosx-x86_64':
         suffix = 'macosx_10_9_x86_64-gf_c469a42.tar.gz'
@@ -117,7 +121,12 @@ def download_openblas(target, plat, ilp64):
 
     if not suffix:
         return None
-    filename = f'{BASEURL}/openblas{fnsuffix}-{OPENBLAS_LONG}-{suffix}'
+    openblas_version = "HEAD" if nightly else OPENBLAS_LONG
+    filename = (
+        f'{BASE_LOC}/{openblas_version}/download/'
+        f'openblas{fnsuffix}-{openblas_version}-{suffix}'
+    )
+    print(f'Attempting to download {filename}', file=sys.stderr)
     req = Request(url=filename, headers=headers)
     try:
         response = urlopen(req)
@@ -138,7 +147,7 @@ def download_openblas(target, plat, ilp64):
     return typ
 
 
-def setup_openblas(plat=get_plat(), ilp64=get_ilp64()):
+def setup_openblas(plat=get_plat(), ilp64=get_ilp64(), nightly=False):
     '''
     Download and setup an openblas library for building. If successful,
     the configuration script will find it automatically.
@@ -152,7 +161,7 @@ def setup_openblas(plat=get_plat(), ilp64=get_ilp64()):
     _, tmp = mkstemp()
     if not plat:
         raise ValueError('unknown platform')
-    typ = download_openblas(tmp, plat, ilp64)
+    typ = download_openblas(tmp, plat, ilp64, nightly=nightly)
     if not typ:
         return ''
     osname, arch = plat.split("-")
@@ -179,10 +188,11 @@ def unpack_windows_zip(fname, plat):
     # Copy the lib to openblas.lib. Once we can properly use pkg-config
     # this will not be needed
     lib = glob.glob(os.path.join(target, 'lib', '*.lib'))
-    assert len(lib) == 1
-    for f in lib:
-        shutil.copy(f, os.path.join(target, 'lib', 'openblas.lib'))
-        shutil.copy(f, os.path.join(target, 'lib', 'openblas64_.lib'))
+    if len(lib) == 1:
+        # The 64-bit tarball already has these copied, no need to do it
+        for f in lib:
+            shutil.copy(f, os.path.join(target, 'lib', 'openblas.lib'))
+            shutil.copy(f, os.path.join(target, 'lib', 'openblas64_.lib'))
     # Copy the dll from bin to lib so system_info can pick it up
     dll = glob.glob(os.path.join(target, 'bin', '*.dll'))
     for f in dll:
@@ -228,27 +238,31 @@ def extract_tarfile_to(tarfileobj, target_path, archive_path):
 def make_init(dirname):
     '''
     Create a _distributor_init.py file for OpenBlas
+
+    Obsoleted by the use of delvewheel in wheel building, which
+    adds an equivalent snippet to numpy/__init__.py, but still useful in CI
     '''
-    with open(os.path.join(dirname, '_distributor_init.py'), 'wt') as fid:
+    with open(os.path.join(dirname, '_distributor_init.py'), 'w') as fid:
         fid.write(textwrap.dedent("""
             '''
             Helper to preload windows dlls to prevent dll not found errors.
             Once a DLL is preloaded, its namespace is made available to any
             subsequent DLL. This file originated in the numpy-wheels repo,
             and is created as part of the scripts that build the wheel.
+
             '''
             import os
             import glob
             if os.name == 'nt':
-                # convention for storing / loading the DLL from
-                # numpy/.libs/, if present
+                # load any DLL from numpy/../numpy.libs/, if present
                 try:
                     from ctypes import WinDLL
-                    basedir = os.path.dirname(__file__)
                 except:
                     pass
                 else:
-                    libs_dir = os.path.abspath(os.path.join(basedir, '.libs'))
+                    basedir = os.path.dirname(__file__)
+                    libs_dir = os.path.join(basedir, os.pardir, 'numpy.libs')
+                    libs_dir = os.path.abspath(libs_dir)
                     DLL_filenames = []
                     if os.path.isdir(libs_dir):
                         for filename in glob.glob(os.path.join(libs_dir,
@@ -296,15 +310,11 @@ def test_setup(plats):
             if not target:
                 raise RuntimeError(f'Could not setup {plat}')
             print('success with', plat, ilp64)
-            if osname == 'win':
-                if not target.endswith('.a'):
-                    raise RuntimeError("Not .a extracted!")
-            else:
-                files = glob.glob(os.path.join(target, "lib", "*.a"))
-                if not files:
-                    raise RuntimeError("No lib/*.a unpacked!")
+            files = glob.glob(os.path.join(target, "lib", "*.a"))
+            if not files:
+                raise RuntimeError("No lib/*.a unpacked!")
         finally:
-            if target is not None:
+            if target:
                 if os.path.isfile(target):
                     os.unlink(target)
                 else:
@@ -323,6 +333,9 @@ def test_version(expected_version=None):
 
     data = threadpoolctl.threadpool_info()
     if len(data) != 1:
+        if platform.python_implementation() == 'PyPy':
+            print(f"Not using OpenBLAS for PyPy in Azure CI, so skip this")
+            return
         raise ValueError(f"expected single threadpool_info result, got {data}")
     if not expected_version:
         expected_version = OPENBLAS_V
@@ -343,11 +356,13 @@ if __name__ == '__main__':
     parser.add_argument('--check_version', nargs='?', default='',
                         help='Check provided OpenBLAS version string '
                              'against available OpenBLAS')
+    parser.add_argument('--nightly', action='store_true',
+                        help='If set, use nightly OpenBLAS build.')
     args = parser.parse_args()
     if args.check_version != '':
         test_version(args.check_version)
     elif args.test is None:
-        print(setup_openblas())
+        print(setup_openblas(nightly=args.nightly))
     else:
         if len(args.test) == 0 or 'all' in args.test:
             test_setup(SUPPORTED_PLATFORMS)

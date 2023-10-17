@@ -132,7 +132,7 @@ def memoize(f):
     def wrapped(*args):
         if args not in _memoized:
             _memoized[args] = f(*args)
-        
+
         return _memoized[args].copy()
 
     return f
@@ -154,7 +154,7 @@ class SortGenerator:
         arr = np.arange(size, dtype=dtype)
         np.random.shuffle(arr)
         return arr
-    
+
     @staticmethod
     @memoize
     def ordered(size, dtype):
@@ -237,7 +237,6 @@ class SortGenerator:
 
         return cls.random_unsorted_area(size, dtype, frac, bubble_size)
 
-
 class Sort(Benchmark):
     """
     This benchmark tests sorting performance with several
@@ -288,6 +287,37 @@ class Sort(Benchmark):
         np.argsort(self.arr, kind=kind)
 
 
+class Partition(Benchmark):
+    params = [
+        ['float64', 'int64', 'float32', 'int32', 'int16', 'float16'],
+        [
+            ('random',),
+            ('ordered',),
+            ('reversed',),
+            ('uniform',),
+            ('sorted_block', 10),
+            ('sorted_block', 100),
+            ('sorted_block', 1000),
+        ],
+        [10, 100, 1000],
+    ]
+    param_names = ['dtype', 'array_type', 'k']
+
+    # The size of the benchmarked arrays.
+    ARRAY_SIZE = 100000
+
+    def setup(self, dtype, array_type, k):
+        np.random.seed(1234)
+        array_class = array_type[0]
+        self.arr = getattr(SortGenerator, array_class)(self.ARRAY_SIZE,
+                dtype, *array_type[1:])
+
+    def time_partition(self, dtype, array_type, k):
+        temp = np.partition(self.arr, k)
+
+    def time_argpartition(self, dtype, array_type, k):
+        temp = np.argpartition(self.arr, k)
+
 class SortWorst(Benchmark):
     def setup(self):
         # quicksort median of 3 worst case
@@ -308,7 +338,9 @@ class SortWorst(Benchmark):
 class Where(Benchmark):
     def setup(self):
         self.d = np.arange(20000)
+        self.d_o = self.d.astype(object)
         self.e = self.d.copy()
+        self.e_o = self.d_o.copy()
         self.cond = (self.d > 5000)
         size = 1024 * 1024 // 8
         rnd_array = np.random.rand(size)
@@ -331,6 +363,11 @@ class Where(Benchmark):
 
     def time_2(self):
         np.where(self.cond, self.d, self.e)
+
+    def time_2_object(self):
+        # object and byteswapped arrays have a
+        # special slow path in the where internals
+        np.where(self.cond, self.d_o, self.e_o)
 
     def time_2_broadcast(self):
         np.where(self.cond, self.d, 0)

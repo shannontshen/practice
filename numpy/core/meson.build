@@ -1,5 +1,3 @@
-# This file should contain what setup.py + setup_common.py do (WIP)
-#
 # Potential issues to address or keep track of:
 #   - sincos detection incorrect on NetBSD: https://github.com/mesonbuild/meson/issues/10641
 
@@ -17,7 +15,10 @@
 # Binary compatibility version number. This number is increased whenever the
 # C-API is changed such that binary compatibility is broken, i.e. whenever a
 # recompile of extension modules is needed.
-C_ABI_VERSION = '0x01000009'
+# NOTE: This is the version against which an extension module was compiled.
+#       As of now compiling against version 2 (0x02000000) yields version 1
+#       compatible binaries (subset).  See also NEP 53.
+C_ABI_VERSION = '0x02000000'
 
 # Minor API version.  This number is increased whenever a change is made to the
 # C-API -- whether it breaks binary compatibility or not.  Some changes, such
@@ -44,11 +45,20 @@ C_ABI_VERSION = '0x01000009'
 # 0x0000000f - 1.22.x
 # 0x00000010 - 1.23.x
 # 0x00000010 - 1.24.x
-C_API_VERSION = '0x00000010'
+# 0x00000011 - 1.25.x
+# 0x00000012 - 2.0.x
+C_API_VERSION = '0x00000012'
 
 # Check whether we have a mismatch between the set C API VERSION and the
 # actual C API VERSION. Will raise a MismatchCAPIError if so.
-run_command('code_generators/verify_c_api_version.py', '--api-version', C_API_VERSION, check: true)
+r = run_command(
+  'code_generators/verify_c_api_version.py', '--api-version', C_API_VERSION,
+  check: true
+)
+
+if r.returncode() != 0
+  error('verify_c_api_version.py failed with output:\n' + r.stderr().strip())
+endif
 
 
 # Generate config.h and _numpyconfig.h
@@ -75,6 +85,7 @@ cdata.set('NPY_API_VERSION', C_API_VERSION)
 use_svml = (
   host_machine.system() == 'linux' and
   host_machine.cpu_family() == 'x86_64' and
+  ('AVX512_SKX' in CPU_DISPATCH_NAMES or 'AVX512_SKX' in CPU_BASELINE_NAMES) and
   not get_option('disable-svml')
 )
 if use_svml
@@ -109,50 +120,60 @@ cdata.set('NPY_SIZEOF_PY_LONG_LONG',
   cc.sizeof('PY_LONG_LONG', dependencies: py_dep, prefix: '#include <Python.h>'))
 
 # Check for complex support
-if cc.has_header('complex.h')
-  cdata.set10('HAVE_COMPLEX_H', true)
-  cdata.set10('NPY_USE_C99_COMPLEX', true)
-  if cc.get_id() == 'msvc'
-    complex_types_to_check = [
-      ['NPY_HAVE_COMPLEX_FLOAT', 'NPY_SIZEOF_COMPLEX_FLOAT', '_Fcomplex', 'float'],
-      ['NPY_HAVE_COMPLEX_DOUBLE', 'NPY_SIZEOF_COMPLEX_DOUBLE', '_Dcomplex', 'double'],
-      ['NPY_HAVE_COMPLEX_LONG_DOUBLE', 'NPY_SIZEOF_COMPLEX_LONGDOUBLE', '_Lcomplex', 'long double'],
-    ]
-  else
-    complex_types_to_check = [
-      ['NPY_HAVE_COMPLEX_FLOAT', 'NPY_SIZEOF_COMPLEX_FLOAT', 'complex float', 'float'],
-      ['NPY_HAVE_COMPLEX_DOUBLE', 'NPY_SIZEOF_COMPLEX_DOUBLE', 'complex double', 'double'],
-      ['NPY_HAVE_COMPLEX_LONG_DOUBLE', 'NPY_SIZEOF_COMPLEX_LONGDOUBLE', 'complex long double', 'long double'],
-    ]
-  endif
-  foreach symbol_type: complex_types_to_check
-    if cc.has_type(symbol_type[2], prefix: '#include <complex.h>')
-      cdata.set10(symbol_type[0], true)
-      # Determine size of NumPy's own, struct-based, complex types. Binary
-      # compatibility with C99 complex types is checked at build time in `npy_common.h`.
-      ftype = symbol_type[3]
-      cdata.set(symbol_type[1], cc.sizeof(f'struct {@ftype@ __x; @ftype@ __y;}'))
-    endif
-  endforeach
+if not cc.has_header('complex.h')
+  error('"complex.h" header not found')
 endif
+
+if cc.get_argument_syntax() == 'msvc'
+  complex_types_to_check = [
+    ['NPY_SIZEOF_COMPLEX_FLOAT', '_Fcomplex'],
+    ['NPY_SIZEOF_COMPLEX_DOUBLE', '_Dcomplex'],
+    ['NPY_SIZEOF_COMPLEX_LONGDOUBLE', '_Lcomplex'],
+  ]
+else
+  complex_types_to_check = [
+    ['NPY_SIZEOF_COMPLEX_FLOAT', 'complex float'],
+    ['NPY_SIZEOF_COMPLEX_DOUBLE', 'complex double'],
+    ['NPY_SIZEOF_COMPLEX_LONGDOUBLE', 'complex long double'],
+  ]
+endif
+foreach symbol_type: complex_types_to_check
+  if not cc.has_type(symbol_type[1], prefix: '#include <complex.h>')
+    t = symbol_type[1]
+    error(f'"complex.h" header does not include complex type @t@')
+  endif
+  cdata.set(symbol_type[0], cc.sizeof(symbol_type[1], prefix: '#include <complex.h>'))
+endforeach
 
 # Mandatory functions: if not found, fail the build
 # Some of these can still be blocklisted if the C99 implementation
 # is buggy, see numpy/core/src/common/npy_config.h
-mandatory_funcs = [
+mandatory_math_funcs = [
   'sin', 'cos', 'tan', 'sinh', 'cosh', 'tanh', 'fabs',
   'floor', 'ceil', 'sqrt', 'log10', 'log', 'exp', 'asin',
   'acos', 'atan', 'fmod', 'modf', 'frexp', 'ldexp',
   'expm1', 'log1p', 'acosh', 'asinh', 'atanh',
-  'rint', 'trunc', 'exp2',
-  'copysign', 'nextafter', 'strtoll', 'strtoull', 'cbrt',
+  'rint', 'trunc', 'exp2', 'copysign', 'nextafter', 'cbrt',
   'log2', 'pow', 'hypot', 'atan2',
-  'csin', 'csinh', 'ccos', 'ccosh', 'ctan', 'ctanh',
-  'creal', 'cimag', 'conj'
 ]
-foreach func: mandatory_funcs
-  if not cc.has_function(func)
-    error('Function `{func}` not found')
+foreach func: mandatory_math_funcs
+  if not cc.has_function(func, prefix: '#include <math.h>', dependencies: m_dep)
+    error(f'Function `@func@` not found')
+  endif
+endforeach
+
+mandatory_complex_math_funcs = [
+  'csin', 'csinh', 'ccos', 'ccosh', 'ctan', 'ctanh', 'creal', 'cimag', 'conj'
+]
+foreach func: mandatory_complex_math_funcs
+  if not cc.has_function(func, prefix: '#include <complex.h>', dependencies: m_dep)
+    error(f'Function `@func@` not found')
+  endif
+endforeach
+
+foreach func: ['strtoll', 'strtoull']
+  if not cc.has_function(func, prefix: '#include <stdlib.h>')
+    error(f'Function `@func@` not found')
   endif
 endforeach
 
@@ -162,18 +183,17 @@ c99_complex_funcs = [
   # The long double variants (like csinl)  should be mandatory on C11,
   # but are missing in FreeBSD. Issue gh-22850
   'csin', 'csinh', 'ccos', 'ccosh', 'ctan', 'ctanh',
-
 ]
 foreach func: c99_complex_funcs
   func_single = func + 'f'
   func_longdouble = func + 'l'
-  if cc.has_function(func)
+  if cc.has_function(func, prefix: '#include <complex.h>', dependencies: m_dep)
     cdata.set10('HAVE_' + func.to_upper(), true)
   endif
-  if cc.has_function(func_single)
+  if cc.has_function(func_single, prefix: '#include <complex.h>', dependencies: m_dep)
     cdata.set10('HAVE_' + func_single.to_upper(), true)
   endif
-  if cc.has_function(func_longdouble)
+  if cc.has_function(func_longdouble, prefix: '#include <complex.h>', dependencies: m_dep)
     cdata.set10('HAVE_' + func_longdouble.to_upper(), true)
   endif
 endforeach
@@ -182,7 +202,7 @@ endforeach
 # libnpymath as a C99 compat layer, these may still be relevant.
 c99_macros = ['isfinite', 'isinf', 'isnan', 'signbit']
 foreach macro: c99_macros
-  if cc.has_function(macro)
+  if cc.has_function(macro, prefix: '#include <math.h>', dependencies: m_dep)
     cdata.set10('NPY_HAVE_DECL_' + macro.to_upper(), true)
     if not cc.has_header_symbol('Python.h', macro, dependencies: py_dep)
       # Add in config.h as well, except if it will clash with Python's config.h content
@@ -261,7 +281,7 @@ else
   # function is not available in CI. For the latter there is a fallback path,
   # but that is broken because we don't have the exact long double
   # representation checks.
-  if cc.get_id() != 'msvc'
+  if cc.get_argument_syntax() != 'msvc'
     cdata.set10('HAVE_STRTOLD_L', false)
   endif
 endif
@@ -282,9 +302,6 @@ endforeach
 
 # SSE headers only enabled automatically on amd64/x32 builds
 optional_headers = [
-  'xmmintrin.h',  # SSE
-  'emmintrin.h',  # SSE2
-  'immintrin.h',  # AVX
   'features.h',   # for glibc version linux
   'xlocale.h',    # see GH#8367
   'dlfcn.h',      # dladdr
@@ -312,6 +329,15 @@ optional_function_attributes = [
 #    cdata.set10('HAVE_ATTRIBUTE_' + attr[1], true)
 #  endif
 #endforeach
+
+# Max possible optimization flags. We pass this flags to all our dispatch-able
+# (multi_targets) sources.
+compiler_id = cc.get_id()
+max_opt = {
+  'msvc': ['/O2'],
+  'intel-cl': ['/O3'],
+}.get(compiler_id, ['-O3'])
+max_opt = cc.has_multi_arguments(max_opt) ? max_opt : []
 
 # Optional GCC compiler builtins and their call arguments.
 # If given, a required header and definition name (HAVE_ prepended)
@@ -356,29 +382,96 @@ foreach intrin: optional_intrinsics
   endif
 endforeach
 
-# long double representation detection (see setup_common.py)
-# TODO: this is still incomplete, and different from how it's done in the
-# numpy.distutils based build, see https://github.com/mesonbuild/meson/issues/11068
-longdouble_size = cc.sizeof('long double')
-if longdouble_size == 8
-  if host_machine.endian() == 'little'
-    longdouble_format = 'IEEE_DOUBLE_LE'
-  else
-    longdouble_format = 'IEEE_DOUBLE_BE'
-  endif
-elif longdouble_size == 12
-  error('This should not be possible, 12 bits of "content" should still result in sizeof() being 16. Please report this error!'
-  )
-elif longdouble_size == 16
-  if host_machine.endian() == 'little'
-    # FIXME: this varies, there's multiple formats here! Not yet implemented.
-    #        TBD how we deal with the mess of old long double formats.
-    longdouble_format = 'INTEL_EXTENDED_16_BYTES_LE'
-  else
-    error('No idea what this is ....')
-  endif
-else
-  error('Unknown long double size: ' + londouble_size)
+# This is a port of the old python code for identifying the long double
+# representation to C.  The old Python code is in this range:
+# https://github.com/numpy/numpy/blob/eead09a3d02c09374942cdc787c0b5e4fe9e7472/numpy/core/setup_common.py#L264-L434
+# This port is in service of solving gh-23972
+# as well as https://github.com/mesonbuild/meson/issues/11068
+longdouble_format = meson.get_external_property('longdouble_format', 'UNKNOWN')
+if longdouble_format == 'UNKNOWN'
+  longdouble_format = meson.get_compiler('c').run(
+'''
+#include <stdio.h>
+#include <string.h>
+
+#define repcmp(z) (memcmp((const char *)&foo.x, z, sizeof(foo.x)) == 0)
+
+const struct {
+  char before[16];
+  long double x;
+  char after[8];
+} foo = {{'\0'}, -123456789.0, {'\0'}};
+
+int main(void) {
+  switch (sizeof(foo.x)) {
+  case 8: {
+    if (repcmp(
+            ((const char[]){0000, 0000, 0000, 0124, 0064, 0157, 0235, 0301}))) {
+      fprintf(stdout, "IEEE_DOUBLE_LE");
+      return 0;
+    }
+    if (repcmp(
+            ((const char[]){0301, 0235, 0157, 0064, 0124, 0000, 0000, 0000}))) {
+      fprintf(stdout, "IEEE_DOUBLE_BE");
+      return 0;
+    }
+    fprintf(stdout, "UNKNOWN");
+    return 1;
+  }
+  case 12: {
+    if (repcmp(((const char[]){0000, 0000, 0000, 0000, 0240, 0242, 0171, 0353,
+                               0031, 0300, 0000, 0000}))) {
+      fprintf(stdout, "INTEL_EXTENDED_12_BYTES_LE");
+      return 0;
+    }
+    if (repcmp(((const char[]){0300, 0031, 0000, 0000, 0353, 0171, 0242, 0240,
+                               0000, 0000, 0000, 0000}))) {
+      fprintf(stdout, "MOTOROLA_EXTENDED_12_BYTES_BE");
+      return 0;
+    }
+    fprintf(stdout, "UNKNOWN");
+    return 1;
+  }
+  case 16: {
+    if (repcmp(
+            ((const char[]){0000, 0000, 0000, 0000, 0240, 0242, 0171, 0353,
+                            0031, 0300, 0000, 0000, 0000, 0000, 0000, 0000}))) {
+      fprintf(stdout, "INTEL_EXTENDED_16_BYTES_LE");
+      return 0;
+    }
+    if (repcmp(
+            ((const char[]){0300, 0031, 0326, 0363, 0105, 0100, 0000, 0000,
+                            0000, 0000, 0000, 0000, 0000, 0000, 0000, 0000}))) {
+      fprintf(stdout, "IEEE_QUAD_BE");
+      return 0;
+    }
+    if (repcmp(
+            ((const char[]){0000, 0000, 0000, 0000, 0000, 0000, 0000, 0000,
+                            0000, 0000, 0100, 0105, 0363, 0326, 0031, 0300}))) {
+      fprintf(stdout, "IEEE_QUAD_LE");
+      return 0;
+    }
+    if (repcmp(
+            ((const char[]){0000, 0000, 0000, 0124, 0064, 0157, 0235, 0301,
+                            0000, 0000, 0000, 0000, 0000, 0000, 0000, 0000}))) {
+      fprintf(stdout, "IBM_DOUBLE_DOUBLE_LE");
+      return 0;
+    }
+    if (repcmp(
+            ((const char[]){0301, 0235, 0157, 0064, 0124, 0000, 0000, 0000,
+                            0000, 0000, 0000, 0000, 0000, 0000, 0000, 0000}))) {
+      fprintf(stdout, "IBM_DOUBLE_DOUBLE_BE");
+      return 0;
+    }
+    fprintf(stdout, "UNKNOWN");
+    return 1;
+  }
+  }
+}
+  ''').stdout()
+endif
+if longdouble_format == 'UNKNOWN' or longdouble_format == 'UNDEFINED'
+  error('Unknown long double format of size: ' + cc.sizeof('long double').to_string())
 endif
 cdata.set10('HAVE_LDOUBLE_' + longdouble_format, true)
 
@@ -395,17 +488,13 @@ endif
 # TODO: document this (search for NPY_NOSMP in C API docs)
 cdata.set10('NPY_NO_SMP', get_option('disable-threading'))
 
-# Use bogus stride debug aid to flush out bugs where users use strides of
-# dimensions with length 1 to index a full contiguous array.
-cdata.set10('NPY_RELAXED_STRIDES_DEBUG', get_option('relaxed-strides-debug'))
-
 # Check whether we can use inttypes (C99) formats
 if cc.has_header_symbol('inttypes.h', 'PRIdPTR')
   cdata.set10('NPY_USE_C99_FORMATS', true)
 endif
 
 visibility_hidden = ''
-if cc.has_function_attribute('visibility:hidden')
+if cc.has_function_attribute('visibility:hidden') and host_machine.system() != 'cygwin'
   visibility_hidden = '__attribute__((visibility("hidden")))'
 endif
 cdata.set('NPY_VISIBILITY_HIDDEN', visibility_hidden)
@@ -423,13 +512,15 @@ _numpyconfig_h = configure_file(
   output: '_numpyconfig.h',
   configuration: cdata,
   install: true,
-  install_dir: np_dir / 'core/include/numpy'
+  install_dir: np_dir / 'core/include/numpy',
+  install_tag: 'devel'
 )
 
 # Build npymath static library
 # ----------------------------
 
 staticlib_cflags = []
+staticlib_cppflags = []
 if cc.get_id() == 'msvc'
   # Disable voltbl section for vc142 to allow link using mingw-w64; see:
   # https://github.com/matthew-brett/dll_investigation/issues/1#issuecomment-1100468171
@@ -438,11 +529,6 @@ if cc.get_id() == 'msvc'
   if cc.has_argument('-d2VolatileMetadata-')
      staticlib_cflags +=  '-d2VolatileMetadata-'
   endif
-endif
-# TODO: change to "feature" option in meson_options.txt? See
-# https://mesonbuild.com/Build-options.html#build-options
-if get_option('disable-simd-optimizations')
-  staticlib_cflags += '-DNPY_DISABLE_OPTIMIZATION'
 endif
 
 npy_math_internal_h = custom_target(
@@ -455,16 +541,19 @@ npymath_sources = [
   src_file.process('src/npymath/ieee754.c.src'),
   src_file.process('src/npymath/npy_math_complex.c.src'),
   npy_math_internal_h,
-  'src/npymath/halffloat.c',
+  'src/npymath/halffloat.cpp',
   'src/npymath/npy_math.c',
 ]
 npymath_lib = static_library('npymath',
   npymath_sources,
   c_args: staticlib_cflags,
+  cpp_args: staticlib_cppflags,
   include_directories: ['include', 'src/npymath', 'src/common'],
   dependencies: py_dep,
   install: true,
   install_dir: np_dir / 'core/lib',
+  name_prefix: name_prefix_staticlib,
+  name_suffix: name_suffix_staticlib,
 )
 
 dir_separator = '/'
@@ -479,7 +568,8 @@ configure_file(
     'sep' : dir_separator,
   }),
   install: true,
-  install_dir: np_dir / 'core/lib/npy-pkg-config'
+  install_dir: np_dir / 'core/lib/npy-pkg-config',
+  install_tag: 'devel'
 )
 configure_file(
   input: 'mlib.ini.in',
@@ -489,7 +579,8 @@ configure_file(
     'msvc_mathlib' : 'm.lib',
   }),
   install: true,
-  install_dir: np_dir / 'core/lib/npy-pkg-config'
+  install_dir: np_dir / 'core/lib/npy-pkg-config',
+  install_tag: 'devel'
 )
 
 if false
@@ -534,7 +625,8 @@ src_numpy_api = custom_target('__multiarray_api',
   input : 'code_generators/generate_numpy_api.py',
   command: [py, '@INPUT@', '-o', '@OUTDIR@', '--ignore', src_umath_api_c],
   install: true,  # NOTE: setup.py build installs all, but just need .h?
-  install_dir: np_dir / 'core/include/numpy'
+  install_dir: np_dir / 'core/include/numpy',
+  install_tag: 'devel'
 )
 
 src_ufunc_api = custom_target('__ufunc_api',
@@ -542,25 +634,17 @@ src_ufunc_api = custom_target('__ufunc_api',
   input : 'code_generators/generate_ufunc_api.py',
   command: [py, '@INPUT@', '-o', '@OUTDIR@'],
   install: true,  # NOTE: setup.py build installs all, but just need .h?
-  install_dir: np_dir / 'core/include/numpy'
+  install_dir: np_dir / 'core/include/numpy',
+  install_tag: 'devel'
 )
 
 
 # Set common build flags for C and C++ code
 # -----------------------------------------
-
-# TODO: change to "feature" option in meson_options.txt? See
-# https://mesonbuild.com/Build-options.html#build-options
-disable_simd_optimizations = []
-if get_option('disable-simd-optimizations')
-  disable_simd_optimizations = '-DNPY_DISABLE_OPTIMIZATION'
-endif
-
 # Common build flags
 c_args_common = [
   '-DNPY_INTERNAL_BUILD',
   '-DHAVE_NPY_CONFIG_H',
-  disable_simd_optimizations,
   cflags_large_file_support,
 ]
 
@@ -568,7 +652,7 @@ c_args_common = [
 cpp_args_common = c_args_common + [
   '-D__STDC_VERSION__=0',  # for compatibility with C headers
 ]
-if cc.get_id() != 'msvc'
+if cc.get_argument_syntax() != 'msvc'
   cpp_args_common += [
     '-fno-exceptions',  # no exception support
     '-fno-rtti',  # no runtime type information
@@ -589,10 +673,8 @@ np_core_dep = declare_dependency(
     '.',
     'include',
     'src/common',
-  ],
-  compile_args: disable_simd_optimizations
+  ]
 )
-
 
 # Build multiarray_tests module
 # -----------------------------
@@ -613,15 +695,30 @@ py.extension_module('_multiarray_tests',
   subdir: 'numpy/core',
 )
 
+_umath_tests_mtargets = mod_features.multi_targets(
+  '_umath_tests.dispatch.h',
+  'src/umath/_umath_tests.dispatch.c',
+  dispatch: [
+    AVX2, SSE41, SSE2,
+    ASIMDHP, ASIMD, NEON,
+    VSX3, VSX2, VSX,
+    VXE, VX,
+  ],
+  baseline: CPU_BASELINE,
+  prefix: 'NPY_',
+  dependencies: [py_dep, np_core_dep]
+)
+
 test_modules_src = [
   ['_umath_tests', [
       src_file.process('src/umath/_umath_tests.c.src'),
-      'src/umath/_umath_tests.dispatch.c',
       'src/common/npy_cpu_features.c',
-    ]],
-  ['_rational_tests', 'src/umath/_rational_tests.c'],
-  ['_struct_ufunc_tests', 'src/umath/_struct_ufunc_tests.c'],
-  ['_operand_flag_tests', 'src/umath/_operand_flag_tests.c'],
+    ],
+    _umath_tests_mtargets.static_lib('_umath_tests_mtargets')
+  ],
+  ['_rational_tests', 'src/umath/_rational_tests.c', []],
+  ['_struct_ufunc_tests', 'src/umath/_struct_ufunc_tests.c', []],
+  ['_operand_flag_tests', 'src/umath/_operand_flag_tests.c', []],
 ]
 foreach gen: test_modules_src
   py.extension_module(gen[0],
@@ -631,7 +728,257 @@ foreach gen: test_modules_src
     dependencies: np_core_dep,
     install: true,
     subdir: 'numpy/core',
+    link_with: gen[2],
   )
+endforeach
+
+# Build multiarray dispatch-able sources
+# --------------------------------------
+multiarray_gen_headers = [
+  src_file.process('src/multiarray/arraytypes.h.src'),
+  src_file.process('src/common/npy_sort.h.src'),
+]
+foreach gen_mtargets : [
+  [
+    'argfunc.dispatch.h',
+    src_file.process('src/multiarray/argfunc.dispatch.c.src'),
+    [
+      AVX512_SKX, AVX2, XOP, SSE42, SSE2,
+      VSX2,
+      ASIMD, NEON,
+      VXE, VX
+    ]
+  ],
+]
+  mtargets = mod_features.multi_targets(
+    gen_mtargets[0], multiarray_gen_headers + gen_mtargets[1],
+    dispatch: gen_mtargets[2],
+    baseline: CPU_BASELINE,
+    prefix: 'NPY_',
+    dependencies: [py_dep, np_core_dep],
+    c_args: c_args_common + max_opt,
+    cpp_args: cpp_args_common + max_opt,
+    include_directories: [
+      'include',
+      'src/common',
+      'src/multiarray',
+      'src/npymath',
+      'src/umath'
+    ]
+  )
+  if not is_variable('multiarray_umath_mtargets')
+    multiarray_umath_mtargets = mtargets
+  else
+    multiarray_umath_mtargets.extend(mtargets)
+  endif
+endforeach
+
+# Build npysort dispatch-able sources
+# -----------------------------------
+foreach gen_mtargets : [
+  [
+    'simd_qsort.dispatch.h',
+    'src/npysort/simd_qsort.dispatch.cpp',
+    [AVX512_SKX]
+  ],
+  [
+    'simd_qsort_16bit.dispatch.h',
+    'src/npysort/simd_qsort_16bit.dispatch.cpp',
+    [AVX512_SPR, AVX512_ICL]
+  ],
+]
+  mtargets = mod_features.multi_targets(
+    gen_mtargets[0], multiarray_gen_headers + gen_mtargets[1],
+    dispatch: gen_mtargets[2],
+    # baseline: CPU_BASELINE, it doesn't provide baseline fallback
+    prefix: 'NPY_',
+    dependencies: [py_dep, np_core_dep],
+    c_args: c_args_common + max_opt,
+    cpp_args: cpp_args_common + max_opt,
+    include_directories: [
+      'include',
+      'src/common',
+      'src/multiarray',
+      'src/npymath',
+      'src/umath'
+    ]
+  )
+  if not is_variable('multiarray_umath_mtargets')
+    multiarray_umath_mtargets = mtargets
+  else
+    multiarray_umath_mtargets.extend(mtargets)
+  endif
+endforeach
+
+# Build umath dispatch-able sources
+# ---------------------------------
+mod_features = import('features')
+umath_gen_headers = [
+  src_file.process('src/umath/loops.h.src'),
+  src_file.process('src/umath/loops_utils.h.src'),
+]
+
+foreach gen_mtargets : [
+  [
+    'loops_arithm_fp.dispatch.h',
+    src_file.process('src/umath/loops_arithm_fp.dispatch.c.src'),
+    [
+      [AVX2, FMA3], SSE2,
+      ASIMD, NEON,
+      VSX3, VSX2,
+      VXE, VX,
+    ]
+  ],
+  [
+    'loops_arithmetic.dispatch.h',
+    src_file.process('src/umath/loops_arithmetic.dispatch.c.src'),
+    [
+      AVX512_SKX, AVX512F, AVX2, SSE41, SSE2,
+      NEON,
+      VSX4, VSX2,
+      VX,
+    ]
+  ],
+  [
+    'loops_comparison.dispatch.h',
+    src_file.process('src/umath/loops_comparison.dispatch.c.src'),
+    [
+      AVX512_SKX, AVX512F, AVX2, SSE42, SSE2,
+      VSX3, VSX2,
+      NEON,
+      VXE, VX,
+    ]
+  ],
+  [
+    'loops_exponent_log.dispatch.h',
+    src_file.process('src/umath/loops_exponent_log.dispatch.c.src'),
+    [
+      AVX512_SKX, AVX512F, [AVX2, FMA3]
+    ]
+  ],
+  [
+    'loops_hyperbolic.dispatch.h',
+    src_file.process('src/umath/loops_hyperbolic.dispatch.c.src'),
+    [
+      AVX512_SKX, [AVX2, FMA3],
+      VSX4, VSX2,
+      NEON_VFPV4,
+      VXE, VX
+    ]
+  ],
+  [
+    'loops_logical.dispatch.h',
+    src_file.process('src/umath/loops_logical.dispatch.c.src'),
+    [
+      ASIMD, NEON,
+      AVX512_SKX, AVX2, SSE2,
+      VSX2,
+      VX,
+    ]
+  ],
+  [
+    'loops_minmax.dispatch.h',
+    src_file.process('src/umath/loops_minmax.dispatch.c.src'),
+    [
+      ASIMD, NEON,
+      AVX512_SKX, AVX2, SSE2,
+      VSX2,
+      VXE, VX,
+    ]
+  ],
+  [
+    'loops_modulo.dispatch.h',
+    src_file.process('src/umath/loops_modulo.dispatch.c.src'),
+    [
+      VSX4
+    ]
+  ],
+  [
+    'loops_trigonometric.dispatch.h',
+    src_file.process('src/umath/loops_trigonometric.dispatch.c.src'),
+    [
+      AVX512F, [AVX2, FMA3],
+      VSX4, VSX3, VSX2,
+      NEON_VFPV4,
+      VXE2, VXE
+    ]
+  ],
+  [
+    'loops_umath_fp.dispatch.h',
+    src_file.process('src/umath/loops_umath_fp.dispatch.c.src'),
+    [AVX512_SKX]
+  ],
+  [
+    'loops_unary.dispatch.h',
+    src_file.process('src/umath/loops_unary.dispatch.c.src'),
+    [
+      ASIMD, NEON,
+      AVX512_SKX, AVX2, SSE2,
+      VSX2,
+      VXE, VX
+    ]
+  ],
+  [
+    'loops_unary_fp.dispatch.h',
+    src_file.process('src/umath/loops_unary_fp.dispatch.c.src'),
+    [
+      SSE41, SSE2,
+      VSX2,
+      ASIMD, NEON,
+      VXE, VX
+    ]
+  ],
+  [
+    'loops_unary_fp_le.dispatch.h',
+    src_file.process('src/umath/loops_unary_fp_le.dispatch.c.src'),
+    [
+      SSE41, SSE2,
+      VSX2,
+      ASIMD, NEON,
+    ]
+  ],
+  [
+    'loops_unary_complex.dispatch.h',
+    src_file.process('src/umath/loops_unary_complex.dispatch.c.src'),
+    [
+      AVX512F, [AVX2, FMA3], SSE2,
+      ASIMD, NEON,
+      VSX3, VSX2,
+      VXE, VX,
+    ]
+  ],
+  [
+    'loops_autovec.dispatch.h',
+    src_file.process('src/umath/loops_autovec.dispatch.c.src'),
+    [
+      AVX2, SSE2,
+      NEON,
+      VSX2,
+      VX,
+    ]
+  ],
+]
+  mtargets = mod_features.multi_targets(
+    gen_mtargets[0], umath_gen_headers + gen_mtargets[1],
+    dispatch: gen_mtargets[2],
+    baseline: CPU_BASELINE,
+    prefix: 'NPY_',
+    dependencies: [py_dep, np_core_dep],
+    c_args: c_args_common + max_opt,
+    cpp_args: cpp_args_common + max_opt,
+    include_directories: [
+      'include',
+      'src/common',
+      'src/multiarray',
+      'src/npymath',
+      'src/umath'
+    ]
+  )
+  if not is_variable('multiarray_umath_mtargets')
+    multiarray_umath_mtargets = mtargets
+  else
+    multiarray_umath_mtargets.extend(mtargets)
+  endif
 endforeach
 
 # Build _multiarray_umath module
@@ -646,6 +993,7 @@ src_multiarray_umath_common = [
   'src/common/ufunc_override.c',
   'src/common/numpyos.c',
   'src/common/npy_cpu_features.c',
+  'src/common/npy_cpu_dispatch.c',
   src_file.process('src/common/templ_common.h.src')
 ]
 if have_blas
@@ -655,12 +1003,10 @@ if have_blas
   ]
 endif
 
-src_multiarray = [
+src_multiarray = multiarray_gen_headers + [
   'src/multiarray/abstractdtypes.c',
   'src/multiarray/alloc.c',
-  src_file.process('src/multiarray/argfunc.dispatch.c.src'),
   'src/multiarray/arrayobject.c',
-  src_file.process('src/multiarray/arraytypes.h.src'),
   'src/multiarray/array_coercion.c',
   'src/multiarray/array_method.c',
   'src/multiarray/array_assign_scalar.c',
@@ -711,12 +1057,8 @@ src_multiarray = [
   'src/multiarray/scalarapi.c',
   'src/multiarray/strfuncs.c',
   'src/multiarray/temp_elide.c',
-  'src/multiarray/typeinfo.c',
   'src/multiarray/usertypes.c',
   'src/multiarray/vdot.c',
-  src_file.process('src/common/npy_sort.h.src'),
-  'src/npysort/simd_qsort.dispatch.cpp',
-  'src/npysort/simd_qsort_16bit.dispatch.cpp',
   'src/npysort/quicksort.cpp',
   'src/npysort/mergesort.cpp',
   'src/npysort/timsort.cpp',
@@ -739,26 +1081,9 @@ src_multiarray = [
   'src/npymath/arm64_exports.c',
 ]
 
-src_umath = [
+src_umath = umath_gen_headers + [
   src_file.process('src/umath/funcs.inc.src'),
-  src_file.process('src/umath/loops.h.src'),
-  src_file.process('src/umath/loops_utils.h.src'),
   src_file.process('src/umath/loops.c.src'),
-  src_file.process('src/umath/loops_arithm_fp.dispatch.c.src'),
-  src_file.process('src/umath/loops_arithmetic.dispatch.c.src'),
-  src_file.process('src/umath/loops_comparison.dispatch.c.src'),
-  src_file.process('src/umath/loops_exponent_log.dispatch.c.src'),
-  src_file.process('src/umath/loops_hyperbolic.dispatch.c.src'),
-  src_file.process('src/umath/loops_logical.dispatch.c.src'),
-  src_file.process('src/umath/loops_minmax.dispatch.c.src'),
-  src_file.process('src/umath/loops_modulo.dispatch.c.src'),
-  src_file.process('src/umath/loops_trigonometric.dispatch.c.src'),
-  src_file.process('src/umath/loops_umath_fp.dispatch.c.src'),
-  src_file.process('src/umath/loops_unary.dispatch.c.src'),
-  src_file.process('src/umath/loops_unary_fp.dispatch.c.src'),
-  src_file.process('src/umath/loops_unary_fp_le.dispatch.c.src'),
-  src_file.process('src/umath/loops_unary_complex.dispatch.c.src'),
-  src_file.process('src/umath/loops_autovec.dispatch.c.src'),
   src_file.process('src/umath/matmul.c.src'),
   src_file.process('src/umath/matmul.h.src'),
   'src/umath/ufunc_type_resolution.c',
@@ -785,52 +1110,24 @@ src_umath = [
 # may be able to avoid the accuracy regressions in SVML.
 svml_objects = []
 if use_svml
-  svml_objects += [
-    'src/umath/svml/linux/avx512/svml_z0_acos_d_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_acos_s_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_acosh_d_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_acosh_s_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_asin_d_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_asin_s_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_asinh_d_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_asinh_s_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_atan2_d_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_atan2_s_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_atan_d_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_atan_s_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_atanh_d_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_atanh_s_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_cbrt_d_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_cbrt_s_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_cos_d_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_cos_s_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_cosh_d_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_cosh_s_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_exp2_d_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_exp2_s_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_exp_d_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_exp_s_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_expm1_d_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_expm1_s_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_log10_d_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_log10_s_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_log1p_d_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_log1p_s_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_log2_d_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_log2_s_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_log_d_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_log_s_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_pow_d_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_pow_s_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_sin_d_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_sin_s_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_sinh_d_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_sinh_s_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_tan_d_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_tan_s_la.s',
-    # 'src/umath/svml/linux/avx512/svml_z0_tanh_d_la.s',
-    'src/umath/svml/linux/avx512/svml_z0_tanh_s_la.s',
+  foreach svml_func : [
+    'acos', 'acosh', 'asin',
+    'asinh', 'atan2',
+    'atan',  'atanh',
+    'cbrt', 'cos',
+    'cosh', 'exp2',
+    'exp', 'expm1',
+    'log10', 'log1p',
+    'log2', 'log',
+    'pow', 'sin', 'sinh', 'tan',
+    'tanh'
   ]
+    foreach svml_sfx : ['d_la', 's_la', 'd_ha', 's_la']
+      svml_objects += [
+        'src/umath/svml/linux/avx512/svml_z0_'+svml_func+'_'+svml_sfx+'.s'
+      ]
+    endforeach
+  endforeach
 endif
 
 py.extension_module('_multiarray_umath',
@@ -855,27 +1152,61 @@ py.extension_module('_multiarray_umath',
     'src/npymath',
     'src/umath',
   ],
-  dependencies: blas,
-  link_with: npymath_lib,
+  dependencies: blas_dep,
+  link_with: [npymath_lib, multiarray_umath_mtargets.static_lib('_multiarray_umath_mtargets')],
   install: true,
   subdir: 'numpy/core',
 )
 
 # Build SIMD module
 # -----------------
+_simd_dispatch = []
+_simd_baseline = []
+foreach target : get_option('test-simd')
+  target = target.strip().to_upper().split(',')
+  mfeatures = []
+  foreach fet_name : target
+    if fet_name == 'BASELINE'
+      _simd_baseline = CPU_BASELINE
+      break
+    endif
+    if fet_name not in CPU_FEATURES
+      error('Expected a valid feature name, got('+fet_name+')')
+    endif
+    mfeatures += CPU_FEATURES[fet_name]
+  endforeach
+  _simd_dispatch += [mfeatures]
+endforeach
+
+_simd_mtargets = mod_features.multi_targets(
+  '_simd.dispatch.h',
+  [
+    src_file.process('src/_simd/_simd_inc.h.src'),
+    src_file.process('src/_simd/_simd_data.inc.src'),
+    src_file.process('src/_simd/_simd.dispatch.c.src'),
+  ],
+  # Skip validating the order of `_simd_dispatch` because we execute all these
+  # features, not just the highest interest one. The sorting doesn't matter
+  # here, given the nature of this testing unit.
+  keep_sort: true,
+  dispatch: _simd_dispatch,
+  baseline: _simd_baseline,
+  prefix: 'NPY_',
+  dependencies: [py_dep, np_core_dep],
+  include_directories: ['src/_simd', 'src/npymath'],
+  c_args: c_args_common,
+  cpp_args: cpp_args_common,
+)
 
 py.extension_module('_simd',
   [
     'src/common/npy_cpu_features.c',
     'src/_simd/_simd.c',
-    src_file.process('src/_simd/_simd_inc.h.src'),
-    src_file.process('src/_simd/_simd_data.inc.src'),
-    src_file.process('src/_simd/_simd.dispatch.c.src'),
   ],
   c_args: c_args_common,
   include_directories: ['src/_simd', 'src/npymath'],
   dependencies: np_core_dep,
-  link_with: npymath_lib,
+  link_with: [npymath_lib, _simd_mtargets.static_lib('_simd_mtargets')],
   install: true,
   subdir: 'numpy/core',
 )
@@ -926,7 +1257,6 @@ python_sources = [
   'shape_base.py',
   'shape_base.pyi',
   'umath.py',
-  'umath_tests.py',
 ]
 
 py.install_sources(
@@ -935,4 +1265,4 @@ py.install_sources(
 )
 
 subdir('include')
-install_subdir('tests', install_dir: np_dir / 'core')
+install_subdir('tests', install_dir: np_dir / 'core', install_tag: 'python-runtime')

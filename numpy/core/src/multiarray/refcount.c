@@ -17,14 +17,11 @@
 #include "numpy/arrayscalars.h"
 #include "iterators.h"
 #include "dtypemeta.h"
+#include "refcount.h"
 
 #include "npy_config.h"
 
 #include "npy_pycompat.h"
-
-static void
-_fillobject(char *optr, PyObject *obj, PyArray_Descr *dtype);
-
 
 /*
  * Helper function to clear a strided memory (normally or always contiguous)
@@ -61,7 +58,7 @@ PyArray_ClearBuffer(
 
 /*
  * Helper function to clear whole array.  It seems plausible that we should
- * be able to get away with assuming the the array is contiguous.
+ * be able to get away with assuming the array is contiguous.
  *
  * Must only be called on arrays which own their data (and asserts this).
  */
@@ -352,6 +349,11 @@ PyArray_XDECREF(PyArrayObject *mp)
     }
     return 0;
 }
+
+
+static void
+_fillobject(char *optr, PyObject *obj, PyArray_Descr *dtype);
+
 
 /*NUMPY_API
  * Assumes contiguous

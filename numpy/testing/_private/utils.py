@@ -21,7 +21,8 @@ import sysconfig
 import numpy as np
 from numpy.core import (
      intp, float32, empty, arange, array_repr, ndarray, isnat, array)
-import numpy.linalg.lapack_lite
+from numpy import isfinite, isnan, isinf
+import numpy.linalg._umath_linalg
 
 from io import StringIO
 
@@ -53,22 +54,18 @@ IS_WASM = platform.machine() in ["wasm32", "wasm64"]
 IS_PYPY = sys.implementation.name == 'pypy'
 IS_PYSTON = hasattr(sys, "pyston_version_info")
 HAS_REFCOUNT = getattr(sys, 'getrefcount', None) is not None and not IS_PYSTON
-HAS_LAPACK64 = numpy.linalg.lapack_lite._ilp64
+HAS_LAPACK64 = numpy.linalg._umath_linalg._ilp64
 
 _OLD_PROMOTION = lambda: np._get_promotion_state() == 'legacy'
 
 IS_MUSL = False
-try:
-    from packaging.tags import sys_tags
-    _tags = list(sys_tags())
-    if 'musllinux' in _tags[0].platform:
-        IS_MUSL = True
-except ImportError:
-    # fallback to sysconfig (might be flaky)
-    # value could be None.
-    v = sysconfig.get_config_var('HOST_GNU_TYPE') or ''
-    if 'musl' in v:
-        IS_MUSL = True
+# alternate way is
+# from packaging.tags import sys_tags
+#     _tags = list(sys_tags())
+#     if 'musllinux' in _tags[0].platform:
+_v = sysconfig.get_config_var('HOST_GNU_TYPE') or ''
+if 'musl' in _v:
+    IS_MUSL = True
 
 
 def assert_(val, msg=''):
@@ -89,62 +86,6 @@ def assert_(val, msg=''):
         except TypeError:
             smsg = msg
         raise AssertionError(smsg)
-
-
-def gisnan(x):
-    """like isnan, but always raise an error if type not supported instead of
-    returning a TypeError object.
-
-    Notes
-    -----
-    isnan and other ufunc sometimes return a NotImplementedType object instead
-    of raising any exception. This function is a wrapper to make sure an
-    exception is always raised.
-
-    This should be removed once this problem is solved at the Ufunc level."""
-    from numpy.core import isnan
-    st = isnan(x)
-    if isinstance(st, type(NotImplemented)):
-        raise TypeError("isnan not supported for this type")
-    return st
-
-
-def gisfinite(x):
-    """like isfinite, but always raise an error if type not supported instead
-    of returning a TypeError object.
-
-    Notes
-    -----
-    isfinite and other ufunc sometimes return a NotImplementedType object
-    instead of raising any exception. This function is a wrapper to make sure
-    an exception is always raised.
-
-    This should be removed once this problem is solved at the Ufunc level."""
-    from numpy.core import isfinite, errstate
-    with errstate(invalid='ignore'):
-        st = isfinite(x)
-        if isinstance(st, type(NotImplemented)):
-            raise TypeError("isfinite not supported for this type")
-    return st
-
-
-def gisinf(x):
-    """like isinf, but always raise an error if type not supported instead of
-    returning a TypeError object.
-
-    Notes
-    -----
-    isinf and other ufunc sometimes return a NotImplementedType object instead
-    of raising any exception. This function is a wrapper to make sure an
-    exception is always raised.
-
-    This should be removed once this problem is solved at the Ufunc level."""
-    from numpy.core import isinf, errstate
-    with errstate(invalid='ignore'):
-        st = isinf(x)
-        if isinstance(st, type(NotImplemented)):
-            raise TypeError("isinf not supported for this type")
-    return st
 
 
 if os.name == 'nt':
@@ -190,7 +131,7 @@ elif sys.platform[:5] == 'linux':
 
         """
         try:
-            with open(_proc_pid_stat, 'r') as f:
+            with open(_proc_pid_stat) as f:
                 l = f.readline().split(' ')
             return int(l[22])
         except Exception:
@@ -217,7 +158,7 @@ if sys.platform[:5] == 'linux':
         if not _load_time:
             _load_time.append(time.time())
         try:
-            with open(_proc_pid_stat, 'r') as f:
+            with open(_proc_pid_stat) as f:
                 l = f.readline().split(' ')
             return int(l[13])
         except Exception:
@@ -243,6 +184,7 @@ else:
 def build_err_msg(arrays, err_msg, header='Items are not equal:',
                   verbose=True, names=('ACTUAL', 'DESIRED'), precision=8):
     msg = ['\n' + header]
+    err_msg = str(err_msg)
     if err_msg:
         if err_msg.find('\n') == -1 and len(err_msg) < 79-len(header):
             msg = [msg[0] + ' ' + err_msg]
@@ -268,17 +210,13 @@ def build_err_msg(arrays, err_msg, header='Items are not equal:',
     return '\n'.join(msg)
 
 
-def assert_equal(actual, desired, err_msg='', verbose=True):
+def assert_equal(actual, desired, err_msg='', verbose=True, *, strict=False):
     """
     Raises an AssertionError if two objects are not equal.
 
     Given two objects (scalars, lists, tuples, dictionaries or numpy arrays),
     check that all elements of these objects are equal. An exception is raised
     at the first conflicting values.
-
-    When one of `actual` and `desired` is a scalar and the other is array_like,
-    the function checks that each element of the array_like object is equal to
-    the scalar.
 
     This function handles NaN comparisons as if NaN was a "normal" number.
     That is, AssertionError is not raised if both objects have NaNs in the same
@@ -295,15 +233,34 @@ def assert_equal(actual, desired, err_msg='', verbose=True):
         The error message to be printed in case of failure.
     verbose : bool, optional
         If True, the conflicting values are appended to the error message.
+    strict : bool, optional
+        If True and either of the `actual` and `desired` arguments is an array,
+        raise an ``AssertionError`` when either the shape or the data type of
+        the arguments does not match. If neither argument is an array, this
+        parameter has no effect.
+
+        .. versionadded:: 2.0.0
 
     Raises
     ------
     AssertionError
         If actual and desired are not equal.
 
+    See Also
+    --------
+    assert_allclose
+    assert_array_almost_equal_nulp,
+    assert_array_max_ulp,
+
+    Notes
+    -----
+    By default, when one of `actual` and `desired` is a scalar and the other is
+    an array, the function checks that each element of the array is equal to
+    the scalar. This behaviour can be disabled by setting ``strict==True``.
+
     Examples
     --------
-    >>> np.testing.assert_equal([4,5], [4,6])
+    >>> np.testing.assert_equal([4, 5], [4, 6])
     Traceback (most recent call last):
         ...
     AssertionError:
@@ -317,6 +274,40 @@ def assert_equal(actual, desired, err_msg='', verbose=True):
 
     >>> np.testing.assert_equal(np.array([1.0, 2.0, np.nan]), [1, 2, np.nan])
 
+    As mentioned in the Notes section, `assert_equal` has special
+    handling for scalars when one of the arguments is an array.
+    Here, the test checks that each value in `x` is 3:
+
+    >>> x = np.full((2, 5), fill_value=3)
+    >>> np.testing.assert_equal(x, 3)
+
+    Use `strict` to raise an AssertionError when comparing a scalar with an
+    array of a different shape:
+
+    >>> np.testing.assert_equal(x, 3, strict=True)
+    Traceback (most recent call last):
+        ...
+    AssertionError:
+    Arrays are not equal
+    <BLANKLINE>
+    (shapes (2, 5), () mismatch)
+     x: array([[3, 3, 3, 3, 3],
+           [3, 3, 3, 3, 3]])
+     y: array(3)
+
+    The `strict` parameter also ensures that the array data types match:
+
+    >>> x = np.array([2, 2, 2])
+    >>> y = np.array([2., 2., 2.], dtype=np.float32)
+    >>> np.testing.assert_equal(x, y, strict=True)
+    Traceback (most recent call last):
+        ...
+    AssertionError:
+    Arrays are not equal
+    <BLANKLINE>
+    (dtypes int64, float32 mismatch)
+     x: array([2, 2, 2])
+     y: array([2., 2., 2.], dtype=float32)
     """
     __tracebackhide__ = True  # Hide traceback for py.test
     if isinstance(desired, dict):
@@ -336,9 +327,10 @@ def assert_equal(actual, desired, err_msg='', verbose=True):
                          verbose)
         return
     from numpy.core import ndarray, isscalar, signbit
-    from numpy.lib import iscomplexobj, real, imag
+    from numpy import iscomplexobj, real, imag
     if isinstance(actual, ndarray) or isinstance(desired, ndarray):
-        return assert_array_equal(actual, desired, err_msg, verbose)
+        return assert_array_equal(actual, desired, err_msg, verbose,
+                                  strict=strict)
     msg = build_err_msg([actual, desired], err_msg, verbose=verbose)
 
     # Handle complex numbers: separate into real/imag to handle
@@ -390,8 +382,8 @@ def assert_equal(actual, desired, err_msg='', verbose=True):
 
     # Inf/nan/negative zero handling
     try:
-        isdesnan = gisnan(desired)
-        isactnan = gisnan(actual)
+        isdesnan = isnan(desired)
+        isactnan = isnan(actual)
         if isdesnan and isactnan:
             return  # both nan, so equal
 
@@ -401,7 +393,7 @@ def assert_equal(actual, desired, err_msg='', verbose=True):
         if (array_actual.dtype.char in 'Mm' or
                 array_desired.dtype.char in 'Mm'):
             # version 1.18
-            # until this version, gisnan failed for datetime64 and timedelta64.
+            # until this version, isnan failed for datetime64 and timedelta64.
             # Now it succeeds but comparison to scalar with a different type
             # emits a DeprecationWarning.
             # Avoid that by skipping the next check
@@ -480,9 +472,9 @@ def assert_almost_equal(actual, desired, decimal=7, err_msg='', verbose=True):
               instead of this function for more consistent floating point
               comparisons.
 
-    The test verifies that the elements of `actual` and `desired` satisfy.
+    The test verifies that the elements of `actual` and `desired` satisfy::
 
-        ``abs(desired-actual) < float64(1.5 * 10**(-decimal))``
+        abs(desired-actual) < float64(1.5 * 10**(-decimal))
 
     That is a looser test than originally documented, but agrees with what the
     actual implementation in `assert_array_almost_equal` did up to rounding
@@ -541,7 +533,7 @@ def assert_almost_equal(actual, desired, decimal=7, err_msg='', verbose=True):
     """
     __tracebackhide__ = True  # Hide traceback for py.test
     from numpy.core import ndarray
-    from numpy.lib import iscomplexobj, real, imag
+    from numpy import iscomplexobj, real, imag
 
     # Handle complex numbers: separate into real/imag to handle
     # nan/inf/negative zero correctly
@@ -582,9 +574,9 @@ def assert_almost_equal(actual, desired, decimal=7, err_msg='', verbose=True):
         # If one of desired/actual is not finite, handle it specially here:
         # check that both are nan if any is a nan, and test for equality
         # otherwise
-        if not (gisfinite(desired) and gisfinite(actual)):
-            if gisnan(desired) or gisnan(actual):
-                if not (gisnan(desired) and gisnan(actual)):
+        if not (isfinite(desired) and isfinite(actual)):
+            if isnan(desired) or isnan(actual):
+                if not (isnan(desired) and isnan(actual)):
                     raise AssertionError(_build_err_msg())
             else:
                 if not desired == actual:
@@ -683,9 +675,9 @@ def assert_approx_equal(actual, desired, significant=7, err_msg='',
         # If one of desired/actual is not finite, handle it specially here:
         # check that both are nan if any is a nan, and test for equality
         # otherwise
-        if not (gisfinite(desired) and gisfinite(actual)):
-            if gisnan(desired) or gisnan(actual):
-                if not (gisnan(desired) and gisnan(actual)):
+        if not (isfinite(desired) and isfinite(actual)):
+            if isnan(desired) or isnan(actual):
+                if not (isnan(desired) and isnan(actual)):
                     raise AssertionError(msg)
             else:
                 if not desired == actual:
@@ -849,6 +841,7 @@ def assert_array_compare(comparison, x, y, err_msg='', verbose=True, header='',
                         remarks.append('Max relative difference: '
                                        + array2string(max_rel_error))
 
+            err_msg = str(err_msg)
             err_msg += '\n' + '\n'.join(remarks)
             msg = build_err_msg([ox, oy], err_msg,
                                 verbose=verbose, header=header,
@@ -877,6 +870,16 @@ def assert_array_equal(x, y, err_msg='', verbose=True, *, strict=False):
 
     The usual caution for verifying equality with floating point numbers is
     advised.
+
+    .. note:: When either `x` or `y` is already an instance of `numpy.ndarray`
+        and `y` is not a ``dict``, the behavior of ``assert_equal(x, y)`` is
+        identical to the behavior of this function. Otherwise, this function
+        performs `np.asanyarray` on the inputs before comparison, whereas
+        `assert_equal` defines special comparison rules for common Python
+        types. For example, only `assert_equal` can be used to compare nested
+        Python lists. In new code, consider using only `assert_equal`,
+        explicitly converting either `x` or `y` to arrays if the behavior of
+        `assert_array_equal` is desired.
 
     Parameters
     ----------
@@ -993,9 +996,9 @@ def assert_array_almost_equal(x, y, decimal=6, err_msg='', verbose=True):
               comparisons.
 
     The test verifies identical shapes and that the elements of ``actual`` and
-    ``desired`` satisfy.
+    ``desired`` satisfy::
 
-        ``abs(desired-actual) < 1.5 * 10**(-decimal)``
+        abs(desired-actual) < 1.5 * 10**(-decimal)
 
     That is a looser test than originally documented, but agrees with what the
     actual implementation did up to rounding vagaries. An exception is raised
@@ -1060,15 +1063,15 @@ def assert_array_almost_equal(x, y, decimal=6, err_msg='', verbose=True):
 
     """
     __tracebackhide__ = True  # Hide traceback for py.test
-    from numpy.core import number, float_, result_type
+    from numpy.core import number, result_type
     from numpy.core.numerictypes import issubdtype
     from numpy.core.fromnumeric import any as npany
 
     def compare(x, y):
         try:
-            if npany(gisinf(x)) or npany(gisinf(y)):
-                xinfid = gisinf(x)
-                yinfid = gisinf(y)
+            if npany(isinf(x)) or npany(isinf(y)):
+                xinfid = isinf(x)
+                yinfid = isinf(y)
                 if not (xinfid == yinfid).all():
                     return False
                 # if one item, x and y is +- inf
@@ -1086,7 +1089,7 @@ def assert_array_almost_equal(x, y, decimal=6, err_msg='', verbose=True):
         z = abs(x - y)
 
         if not issubdtype(z.dtype, number):
-            z = z.astype(float_)  # handle object arrays
+            z = z.astype(np.float64)  # handle object arrays
 
         return z < 1.5 * 10.0**(-decimal)
 
@@ -1095,18 +1098,17 @@ def assert_array_almost_equal(x, y, decimal=6, err_msg='', verbose=True):
              precision=decimal)
 
 
-def assert_array_less(x, y, err_msg='', verbose=True):
+def assert_array_less(x, y, err_msg='', verbose=True, *, strict=False):
     """
     Raises an AssertionError if two array_like objects are not ordered by less
     than.
 
-    Given two array_like objects, check that the shape is equal and all
-    elements of the first object are strictly smaller than those of the
-    second object. An exception is raised at shape mismatch or incorrectly
-    ordered values. Shape mismatch does not raise if an object has zero
-    dimension. In contrast to the standard usage in numpy, NaNs are
-    compared, no assertion is raised if both objects have NaNs in the same
-    positions.
+    Given two array_like objects `x` and `y`, check that the shape is equal and
+    all elements of `x` are strictly less than the corresponding elements of
+    `y` (but see the Notes for the special handling of a scalar). An exception
+    is raised at shape mismatch or values that are not correctly ordered. In
+    contrast to the  standard usage in NumPy, no assertion is raised if both
+    objects have NaNs in the same positions.
 
     Parameters
     ----------
@@ -1118,21 +1120,45 @@ def assert_array_less(x, y, err_msg='', verbose=True):
       The error message to be printed in case of failure.
     verbose : bool
         If True, the conflicting values are appended to the error message.
+    strict : bool, optional
+        If True, raise an AssertionError when either the shape or the data
+        type of the array_like objects does not match. The special
+        handling for scalars mentioned in the Notes section is disabled.
+
+        .. versionadded:: 2.0.0
 
     Raises
     ------
     AssertionError
-      If actual and desired objects are not equal.
+      If x is not strictly smaller than y, element-wise.
 
     See Also
     --------
     assert_array_equal: tests objects for equality
     assert_array_almost_equal: test objects for equality up to precision
 
+    Notes
+    -----
+    When one of `x` and `y` is a scalar and the other is array_like, the
+    function performs the comparison as though the scalar were broadcasted
+    to the shape of the array. This behaviour can be disabled with the `strict`
+    parameter.
+
     Examples
     --------
-    >>> np.testing.assert_array_less([1.0, 1.0, np.nan], [1.1, 2.0, np.nan])
-    >>> np.testing.assert_array_less([1.0, 1.0, np.nan], [1, 2.0, np.nan])
+    The following assertion passes because each finite element of `x` is
+    strictly less than the corresponding element of `y`, and the NaNs are in
+    corresponding locations.
+
+    >>> x = [1.0, 1.0, np.nan]
+    >>> y = [1.1, 2.0, np.nan]
+    >>> np.testing.assert_array_less(x, y)
+
+    The following assertion fails because the zeroth element of `x` is no
+    longer strictly less than the zeroth element of `y`.
+
+    >>> y[0] = 1
+    >>> np.testing.assert_array_less(x, y)
     Traceback (most recent call last):
         ...
     AssertionError:
@@ -1144,34 +1170,46 @@ def assert_array_less(x, y, err_msg='', verbose=True):
      x: array([ 1.,  1., nan])
      y: array([ 1.,  2., nan])
 
-    >>> np.testing.assert_array_less([1.0, 4.0], 3)
+    Here, `y` is a scalar, so each element of `x` is compared to `y`, and
+    the assertion passes.
+
+    >>> x = [1.0, 4.0]
+    >>> y = 5.0
+    >>> np.testing.assert_array_less(x, y)
+
+    However, with ``strict=True``, the assertion will fail because the shapes
+    do not match.
+
+    >>> np.testing.assert_array_less(x, y, strict=True)
     Traceback (most recent call last):
         ...
     AssertionError:
     Arrays are not less-ordered
     <BLANKLINE>
-    Mismatched elements: 1 / 2 (50%)
-    Max absolute difference: 2.
-    Max relative difference: 0.66666667
+    (shapes (2,), () mismatch)
      x: array([1., 4.])
-     y: array(3)
+     y: array(5.)
 
-    >>> np.testing.assert_array_less([1.0, 2.0, 3.0], [4])
+    With ``strict=True``, the assertion also fails if the dtypes of the two
+    arrays do not match.
+
+    >>> y = [5, 5]
+    >>> np.testing.assert_array_less(x, y, strict=True)
     Traceback (most recent call last):
         ...
     AssertionError:
     Arrays are not less-ordered
     <BLANKLINE>
-    (shapes (3,), (1,) mismatch)
-     x: array([1., 2., 3.])
-     y: array([4])
-
+    (dtypes float64, int64 mismatch)
+     x: array([1., 4.])
+     y: array([5, 5])
     """
     __tracebackhide__ = True  # Hide traceback for py.test
     assert_array_compare(operator.__lt__, x, y, err_msg=err_msg,
                          verbose=verbose,
                          header='Arrays are not less-ordered',
-                         equal_inf=False)
+                         equal_inf=False,
+                         strict=strict)
 
 
 def runstring(astr, dict):
@@ -1267,7 +1305,7 @@ def rundocs(filename=None, raise_on_error=True):
     -----
     The doctests can be run by the user/developer by adding the ``doctests``
     argument to the ``test()`` call. For example, to run all tests (including
-    doctests) for `numpy.lib`:
+    doctests) for ``numpy.lib``:
 
     >>> np.lib.test(doctests=True)  # doctest: +SKIP
     """
@@ -1303,8 +1341,8 @@ def check_support_sve():
     import subprocess
     cmd = 'lscpu'
     try:
-        return "sve" in (subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                            shell=True).communicate()[0]).decode('utf-8')
+        output = subprocess.run(cmd, capture_output=True, text=True)
+        return 'sve' in output.stdout
     except OSError:
         return False
 
@@ -1495,7 +1533,7 @@ def _assert_valid_refcount(op):
 
 
 def assert_allclose(actual, desired, rtol=1e-7, atol=0, equal_nan=True,
-                    err_msg='', verbose=True):
+                    err_msg='', verbose=True, *, strict=False):
     """
     Raises an AssertionError if two objects are not equal up to desired
     tolerance.
@@ -1528,6 +1566,12 @@ def assert_allclose(actual, desired, rtol=1e-7, atol=0, equal_nan=True,
         The error message to be printed in case of failure.
     verbose : bool, optional
         If True, the conflicting values are appended to the error message.
+    strict : bool, optional
+        If True, raise an ``AssertionError`` when either the shape or the data
+        type of the arguments does not match. The special handling of scalars
+        mentioned in the Notes section is disabled.
+
+        .. versionadded:: 2.0.0
 
     Raises
     ------
@@ -1541,14 +1585,48 @@ def assert_allclose(actual, desired, rtol=1e-7, atol=0, equal_nan=True,
     Notes
     -----
     When one of `actual` and `desired` is a scalar and the other is
-    array_like, the function checks that each element of the array_like
-    object is equal to the scalar.
+    array_like, the function performs the comparison as if the scalar were
+    broadcasted to the shape of the array.
+    This behaviour can be disabled with the `strict` parameter.
 
     Examples
     --------
     >>> x = [1e-5, 1e-3, 1e-1]
     >>> y = np.arccos(np.cos(x))
     >>> np.testing.assert_allclose(x, y, rtol=1e-5, atol=0)
+
+    As mentioned in the Notes section, `assert_allclose` has special
+    handling for scalars. Here, the test checks that the value of `numpy.sin`
+    is nearly zero at integer multiples of π.
+
+    >>> x = np.arange(3) * np.pi
+    >>> np.testing.assert_allclose(np.sin(x), 0, atol=1e-15)
+
+    Use `strict` to raise an ``AssertionError`` when comparing an array
+    with one or more dimensions against a scalar.
+
+    >>> np.testing.assert_allclose(np.sin(x), 0, atol=1e-15, strict=True)
+    Traceback (most recent call last):
+        ...
+    AssertionError:
+    Not equal to tolerance rtol=1e-07, atol=1e-15
+    <BLANKLINE>
+    (shapes (3,), () mismatch)
+     x: array([ 0.000000e+00,  1.224647e-16, -2.449294e-16])
+     y: array(0)
+
+    The `strict` parameter also ensures that the array data types match:
+
+    >>> y = np.zeros(3, dtype=np.float32)
+    >>> np.testing.assert_allclose(np.sin(x), y, atol=1e-15, strict=True)
+    Traceback (most recent call last):
+        ...
+    AssertionError:
+    Not equal to tolerance rtol=1e-07, atol=1e-15
+    <BLANKLINE>
+    (dtypes float64, float32 mismatch)
+     x: array([ 0.000000e+00,  1.224647e-16, -2.449294e-16])
+     y: array([0., 0., 0.], dtype=float32)
 
     """
     __tracebackhide__ = True  # Hide traceback for py.test
@@ -1561,7 +1639,8 @@ def assert_allclose(actual, desired, rtol=1e-7, atol=0, equal_nan=True,
     actual, desired = np.asanyarray(actual), np.asanyarray(desired)
     header = f'Not equal to tolerance rtol={rtol:g}, atol={atol:g}'
     assert_array_compare(compare, actual, desired, err_msg=str(err_msg),
-                         verbose=verbose, header=header, equal_nan=equal_nan)
+                         verbose=verbose, header=header, equal_nan=equal_nan,
+                         strict=strict)
 
 
 def assert_array_almost_equal_nulp(x, y, nulp=1):
@@ -1791,7 +1870,7 @@ def assert_warns(warning_class, *args, **kwargs):
     If a different type of warning is thrown, it will not be caught.
 
     If called with all arguments other than the warning class omitted, may be
-    used as a context manager:
+    used as a context manager::
 
         with assert_warns(SomeWarning):
             do_something()
@@ -1851,7 +1930,7 @@ def assert_no_warnings(*args, **kwargs):
     """
     Fail if the given callable produces any warnings.
 
-    If called with all arguments omitted, may be used as a context manager:
+    If called with all arguments omitted, may be used as a context manager::
 
         with assert_no_warnings():
             do_something()
@@ -2394,7 +2473,7 @@ def assert_no_gc_cycles(*args, **kwargs):
     """
     Fail if the given callable produces any reference cycles.
 
-    If called with all arguments omitted, may be used as a context manager:
+    If called with all arguments omitted, may be used as a context manager::
 
         with assert_no_gc_cycles():
             do_something()
@@ -2520,7 +2599,7 @@ def _get_mem_available():
 
     if sys.platform.startswith('linux'):
         info = {}
-        with open('/proc/meminfo', 'r') as f:
+        with open('/proc/meminfo') as f:
             for line in f:
                 p = line.split()
                 info[p[0].strip(':').lower()] = int(p[1]) * 1024
@@ -2565,4 +2644,3 @@ def _get_glibc_version():
 
 _glibcver = _get_glibc_version()
 _glibc_older_than = lambda x: (_glibcver != '0.0' and _glibcver < x)
-

@@ -22,6 +22,7 @@
 #include "mem_overlap.h"
 #include "alloc.h"
 #include "npy_buffer.h"
+#include "shape.h"
 
 /*******************  array attribute get and set routines ******************/
 
@@ -797,18 +798,15 @@ array_imag_get(PyArrayObject *self, void *NPY_UNUSED(ignored))
     }
     else {
         Py_INCREF(PyArray_DESCR(self));
-        ret = (PyArrayObject *)PyArray_NewFromDescr(Py_TYPE(self),
-                                                    PyArray_DESCR(self),
-                                                    PyArray_NDIM(self),
-                                                    PyArray_DIMS(self),
-                                                    NULL, NULL,
-                                                    PyArray_ISFORTRAN(self),
-                                                    (PyObject *)self);
+        ret = (PyArrayObject *)PyArray_NewFromDescr_int(
+                Py_TYPE(self),
+                PyArray_DESCR(self),
+                PyArray_NDIM(self),
+                PyArray_DIMS(self),
+                NULL, NULL,
+                PyArray_ISFORTRAN(self),
+                (PyObject *)self, NULL, _NPY_ARRAY_ZEROED);
         if (ret == NULL) {
-            return NULL;
-        }
-        if (_zerofill(ret) < 0) {
-            Py_DECREF(ret);
             return NULL;
         }
         PyArray_CLEARFLAGS(ret, NPY_ARRAY_WRITEABLE);
@@ -934,6 +932,40 @@ array_transpose_get(PyArrayObject *self, void *NPY_UNUSED(ignored))
     return PyArray_Transpose(self, NULL);
 }
 
+static PyObject *
+array_matrix_transpose_get(PyArrayObject *self, void *NPY_UNUSED(ignored))
+{
+    return PyArray_MatrixTranspose(self);
+}
+
+static PyObject *
+array_ptp(PyArrayObject *self, void *NPY_UNUSED(ignored))
+{
+    PyErr_SetString(PyExc_AttributeError,
+                    "`ptp` was removed from the ndarray class in NumPy 2.0. "
+                    "Use np.ptp(arr, ...) instead.");
+    return NULL;
+}
+
+static PyObject *
+array_newbyteorder(PyArrayObject *self, PyObject *args)
+{
+    PyErr_SetString(PyExc_AttributeError,
+                    "`newbyteorder` was removed from the ndarray class "
+                    "in NumPy 2.0. "
+                    "Use `arr.view(arr.dtype.newbyteorder(order))` instead.");
+    return NULL;
+}
+
+static PyObject *
+array_itemset(PyArrayObject *self, PyObject *args)
+{
+    PyErr_SetString(PyExc_AttributeError,
+                    "`itemset` was removed from the ndarray class in "
+                    "NumPy 2.0. Use `arr[index] = value` instead.");
+    return NULL;
+}
+
 NPY_NO_EXPORT PyGetSetDef array_getsetlist[] = {
     {"ndim",
         (getter)array_ndim_get,
@@ -993,6 +1025,22 @@ NPY_NO_EXPORT PyGetSetDef array_getsetlist[] = {
         NULL, NULL},
     {"T",
         (getter)array_transpose_get,
+        NULL,
+        NULL, NULL},
+    {"mT",
+        (getter)array_matrix_transpose_get,
+        NULL,
+        NULL, NULL},
+    {"ptp",
+        (getter)array_ptp,
+        NULL,
+        NULL, NULL},
+    {"newbyteorder",
+        (getter)array_newbyteorder,
+        NULL,
+        NULL, NULL},
+    {"itemset",
+        (getter)array_itemset,
         NULL,
         NULL, NULL},
     {"__array_interface__",

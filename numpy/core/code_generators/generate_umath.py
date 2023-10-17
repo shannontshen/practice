@@ -109,6 +109,11 @@ def _check_order(types1, types2):
         if t2i > t1i:
             break
 
+    if types1 == "QQ?" and types2 == "qQ?":
+        # Explicitly allow this mixed case, rather than figure out what order
+        # is nicer or how to encode it.
+        return
+
     raise TypeError(
             f"Input dtypes are unsorted or duplicate: {types1} and {types2}")
 
@@ -523,49 +528,67 @@ defdict = {
     Ufunc(2, 1, None,
           docstrings.get('numpy.core.umath.greater'),
           'PyUFunc_SimpleBinaryComparisonTypeResolver',
-          TD(all, out='?', dispatch=[('loops_comparison', bints+'fd')]),
-          [TypeDescription('O', FullTypeDescr, 'OO', 'O')],
+          TD(bints, out='?'),
+          [TypeDescription('q', FullTypeDescr, 'qQ', '?'),
+           TypeDescription('q', FullTypeDescr, 'Qq', '?')],
+          TD(inexact+times, out='?', dispatch=[('loops_comparison', bints+'fd')]),
           TD('O', out='?'),
+          [TypeDescription('O', FullTypeDescr, 'OO', 'O')],
           ),
 'greater_equal':
     Ufunc(2, 1, None,
           docstrings.get('numpy.core.umath.greater_equal'),
           'PyUFunc_SimpleBinaryComparisonTypeResolver',
-          TD(all, out='?', dispatch=[('loops_comparison', bints+'fd')]),
-          [TypeDescription('O', FullTypeDescr, 'OO', 'O')],
+          TD(bints, out='?'),
+          [TypeDescription('q', FullTypeDescr, 'qQ', '?'),
+           TypeDescription('q', FullTypeDescr, 'Qq', '?')],
+          TD(inexact+times, out='?', dispatch=[('loops_comparison', bints+'fd')]),
           TD('O', out='?'),
+          [TypeDescription('O', FullTypeDescr, 'OO', 'O')],
           ),
 'less':
     Ufunc(2, 1, None,
           docstrings.get('numpy.core.umath.less'),
           'PyUFunc_SimpleBinaryComparisonTypeResolver',
-          TD(all, out='?', dispatch=[('loops_comparison', bints+'fd')]),
-          [TypeDescription('O', FullTypeDescr, 'OO', 'O')],
+          TD(bints, out='?'),
+          [TypeDescription('q', FullTypeDescr, 'qQ', '?'),
+           TypeDescription('q', FullTypeDescr, 'Qq', '?')],
+          TD(inexact+times, out='?', dispatch=[('loops_comparison', bints+'fd')]),
           TD('O', out='?'),
+          [TypeDescription('O', FullTypeDescr, 'OO', 'O')],
           ),
 'less_equal':
     Ufunc(2, 1, None,
           docstrings.get('numpy.core.umath.less_equal'),
           'PyUFunc_SimpleBinaryComparisonTypeResolver',
-          TD(all, out='?', dispatch=[('loops_comparison', bints+'fd')]),
-          [TypeDescription('O', FullTypeDescr, 'OO', 'O')],
+          TD(bints, out='?'),
+          [TypeDescription('q', FullTypeDescr, 'qQ', '?'),
+           TypeDescription('q', FullTypeDescr, 'Qq', '?')],
+          TD(inexact+times, out='?', dispatch=[('loops_comparison', bints+'fd')]),
           TD('O', out='?'),
+          [TypeDescription('O', FullTypeDescr, 'OO', 'O')],
           ),
 'equal':
     Ufunc(2, 1, None,
           docstrings.get('numpy.core.umath.equal'),
           'PyUFunc_SimpleBinaryComparisonTypeResolver',
-          TD(all, out='?', dispatch=[('loops_comparison', bints+'fd')]),
-          [TypeDescription('O', FullTypeDescr, 'OO', 'O')],
+          TD(bints, out='?'),
+          [TypeDescription('q', FullTypeDescr, 'qQ', '?'),
+           TypeDescription('q', FullTypeDescr, 'Qq', '?')],
+          TD(inexact+times, out='?', dispatch=[('loops_comparison', bints+'fd')]),
           TD('O', out='?'),
+          [TypeDescription('O', FullTypeDescr, 'OO', 'O')],
           ),
 'not_equal':
     Ufunc(2, 1, None,
           docstrings.get('numpy.core.umath.not_equal'),
           'PyUFunc_SimpleBinaryComparisonTypeResolver',
-          TD(all, out='?', dispatch=[('loops_comparison', bints+'fd')]),
-          [TypeDescription('O', FullTypeDescr, 'OO', 'O')],
+          TD(bints, out='?'),
+          [TypeDescription('q', FullTypeDescr, 'qQ', '?'),
+           TypeDescription('q', FullTypeDescr, 'Qq', '?')],
+          TD(inexact+times, out='?', dispatch=[('loops_comparison', bints+'fd')]),
           TD('O', out='?'),
+          [TypeDescription('O', FullTypeDescr, 'OO', 'O')],
           ),
 'logical_and':
     Ufunc(2, 1, True_,
@@ -799,7 +822,7 @@ defdict = {
           None,
           TD('e', dispatch=[('loops_umath_fp', 'e')]),
           TD('f', dispatch=[('loops_trigonometric', 'f')]),
-          TD('d', dispatch=[('loops_umath_fp', 'd')]),
+          TD('d', dispatch=[('loops_trigonometric', 'd')]),
           TD('g' + cmplx, f='cos'),
           TD(P, f='cos'),
           ),
@@ -809,7 +832,7 @@ defdict = {
           None,
           TD('e', dispatch=[('loops_umath_fp', 'e')]),
           TD('f', dispatch=[('loops_trigonometric', 'f')]),
-          TD('d', dispatch=[('loops_umath_fp', 'd')]),
+          TD('d', dispatch=[('loops_trigonometric', 'd')]),
           TD('g' + cmplx, f='sin'),
           TD(P, f='sin'),
           ),
@@ -1099,6 +1122,13 @@ defdict = {
           TD(ints),
           TD('O', f='npy_ObjectLCM'),
           ),
+'bitwise_count':
+    Ufunc(1, 1, None,
+          docstrings.get('numpy.core.umath.bitwise_count'),
+          None,
+          TD(ints, dispatch=[('loops_autovec', ints)], out='B'),
+          TD(P, f='bit_count'),
+          ),
 'matmul' :
     Ufunc(2, 1, None,
           docstrings.get('numpy.core.umath.matmul'),
@@ -1107,6 +1137,11 @@ defdict = {
           TD(O),
           signature='(n?,k),(k,m?)->(n?,m?)',
           ),
+'isalpha':
+    Ufunc(1, 1, False_,
+          docstrings.get('numpy.core.umath.isalpha'),
+          None,
+          )
 }
 
 def indent(st, spaces):
@@ -1172,7 +1207,10 @@ def make_arrays(funcdict):
             if t.func_data is FullTypeDescr:
                 tname = english_upper(chartoname[t.type])
                 datalist.append('(void *)NULL')
-                cfunc_fname = f"{tname}_{t.in_}_{t.out}_{cfunc_alias}"
+                if t.out == "?":
+                    cfunc_fname = f"{tname}_{t.in_}_bool_{cfunc_alias}"
+                else:
+                    cfunc_fname = f"{tname}_{t.in_}_{t.out}_{cfunc_alias}"
             elif isinstance(t.func_data, FuncNameSuffix):
                 datalist.append('(void *)NULL')
                 tname = english_upper(chartoname[t.type])
@@ -1214,7 +1252,9 @@ def make_arrays(funcdict):
             if cfunc_fname:
                 funclist.append(cfunc_fname)
                 if t.dispatch:
-                    dispdict.setdefault(t.dispatch, []).append((name, k, cfunc_fname))
+                    dispdict.setdefault(t.dispatch, []).append(
+                        (name, k, cfunc_fname, t.in_ + t.out)
+                    )
             else:
                 funclist.append('NULL')
 
@@ -1223,15 +1263,20 @@ def make_arrays(funcdict):
 
             k += 1
 
-        funcnames = ', '.join(funclist)
-        signames = ', '.join(siglist)
-        datanames = ', '.join(datalist)
-        code1list.append("static PyUFuncGenericFunction %s_functions[] = {%s};"
-                         % (name, funcnames))
-        code1list.append("static void * %s_data[] = {%s};"
-                         % (name, datanames))
-        code1list.append("static char %s_signatures[] = {%s};"
-                         % (name, signames))
+        if funclist or siglist or datalist:
+            funcnames = ', '.join(funclist)
+            signames = ', '.join(siglist)
+            datanames = ', '.join(datalist)
+            code1list.append(
+                "static PyUFuncGenericFunction %s_functions[] = {%s};"
+                % (name, funcnames))
+            code1list.append("static void * %s_data[] = {%s};"
+                            % (name, datanames))
+            code1list.append("static char %s_signatures[] = {%s};"
+                            % (name, signames))
+            uf.empty = False
+        else:
+            uf.empty = True
 
     for dname, funcs in dispdict.items():
         code2list.append(textwrap.dedent(f"""
@@ -1239,8 +1284,9 @@ def make_arrays(funcdict):
             #include "{dname}.dispatch.h"
             #endif
         """))
-        for (ufunc_name, func_idx, cfunc_name) in funcs:
+        for (ufunc_name, func_idx, cfunc_name, inout) in funcs:
             code2list.append(textwrap.dedent(f"""\
+                NPY_CPU_DISPATCH_TRACE("{ufunc_name}", "{''.join(inout)}");
                 NPY_CPU_DISPATCH_CALL_XB({ufunc_name}_functions[{func_idx}] = {cfunc_name});
             """))
     return "\n".join(code1list), "\n".join(code2list)
@@ -1261,7 +1307,7 @@ def make_ufuncs(funcdict):
                 return -1;
             }}
             f = PyUFunc_FromFuncAndDataAndSignatureAndIdentity(
-                {name}_functions, {name}_data, {name}_signatures, {nloops},
+                {funcs}, {data}, {signatures}, {nloops},
                 {nin}, {nout}, {identity}, "{name}",
                 {doc}, 0, {sig}, identity
             );
@@ -1273,7 +1319,11 @@ def make_ufuncs(funcdict):
             }}
         """)
         args = dict(
-            name=name, nloops=len(uf.type_descriptions),
+            name=name,
+            funcs=f"{name}_functions" if not uf.empty else "NULL",
+            data=f"{name}_data" if not uf.empty else "NULL",
+            signatures=f"{name}_signatures" if not uf.empty else "NULL",
+            nloops=len(uf.type_descriptions),
             nin=uf.nin, nout=uf.nout,
             has_identity='0' if uf.identity is None_ else '1',
             identity='PyUFunc_IdentityValue',

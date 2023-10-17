@@ -5,6 +5,7 @@ import textwrap
 import subprocess
 
 import numpy as np
+import numpy.core.umath as ncu
 import numpy.core._multiarray_tests as _multiarray_tests
 from numpy import array, arange, nditer, all
 from numpy.testing import (
@@ -822,7 +823,8 @@ def test_iter_nbo_align_contig():
 
     # Byte order change by requesting a specific dtype
     a = np.arange(6, dtype='f4')
-    au = a.byteswap().newbyteorder()
+    au = a.byteswap()
+    au = au.view(au.dtype.newbyteorder())
     assert_(a.dtype.byteorder != au.dtype.byteorder)
     i = nditer(au, [], [['readwrite', 'updateifcopy']],
                         casting='equiv',
@@ -837,7 +839,8 @@ def test_iter_nbo_align_contig():
     del i  # should not raise a warning
     # Byte order change by requesting NBO
     a = np.arange(6, dtype='f4')
-    au = a.byteswap().newbyteorder()
+    au = a.byteswap()
+    au = au.view(au.dtype.newbyteorder())
     assert_(a.dtype.byteorder != au.dtype.byteorder)
     with nditer(au, [], [['readwrite', 'updateifcopy', 'nbo']],
                         casting='equiv') as i:
@@ -1391,7 +1394,7 @@ def test_iter_copy():
 
 @pytest.mark.parametrize("dtype", np.typecodes["All"])
 @pytest.mark.parametrize("loop_dtype", np.typecodes["All"])
-@pytest.mark.filterwarnings("ignore::numpy.ComplexWarning")
+@pytest.mark.filterwarnings("ignore::numpy.exceptions.ComplexWarning")
 def test_iter_copy_casts(dtype, loop_dtype):
     # Ensure the dtype is never flexible:
     if loop_dtype.lower() == "m":
@@ -1476,7 +1479,7 @@ def test_iter_copy_casts_structured2():
 
     # Array of two structured scalars:
     for res in res1, res2:
-        # Cast to tuple by getitem, which may be weird and changable?:
+        # Cast to tuple by getitem, which may be weird and changeable?:
         assert type(res["a"][0]) == tuple
         assert res["a"][0] == (1, 1)
 
@@ -1573,7 +1576,8 @@ def test_iter_allocate_output_types_byte_order():
     # Verify the rules for byte order changes
 
     # When there's just one input, the output type exactly matches
-    a = array([3], dtype='u4').newbyteorder()
+    a = array([3], dtype='u4')
+    a = a.view(a.dtype.newbyteorder())
     i = nditer([a, None], [],
                     [['readonly'], ['writeonly', 'allocate']])
     assert_equal(i.dtypes[0], i.dtypes[1])
@@ -1785,8 +1789,9 @@ def test_iter_buffering():
     # Test buffering with several buffer sizes and types
     arrays = []
     # F-order swapped array
-    arrays.append(np.arange(24,
-                    dtype='c16').reshape(2, 3, 4).T.newbyteorder().byteswap())
+    _tmp = np.arange(24, dtype='c16').reshape(2, 3, 4).T
+    _tmp = _tmp.view(_tmp.dtype.newbyteorder()).byteswap()
+    arrays.append(_tmp)
     # Contiguous 1-dimensional array
     arrays.append(np.arange(10, dtype='f4'))
     # Unaligned array
@@ -1814,7 +1819,8 @@ def test_iter_write_buffering():
     # Test that buffering of writes is working
 
     # F-order swapped array
-    a = np.arange(24).reshape(2, 3, 4).T.newbyteorder().byteswap()
+    a = np.arange(24).reshape(2, 3, 4).T
+    a = a.view(a.dtype.newbyteorder()).byteswap()
     i = nditer(a, ['buffered'],
                    [['readwrite', 'nbo', 'aligned']],
                    casting='equiv',
@@ -1873,7 +1879,8 @@ def test_iter_buffered_cast_simple():
 def test_iter_buffered_cast_byteswapped():
     # Test that buffering can handle a cast which requires swap->cast->swap
 
-    a = np.arange(10, dtype='f4').newbyteorder().byteswap()
+    a = np.arange(10, dtype='f4')
+    a = a.view(a.dtype.newbyteorder()).byteswap()
     i = nditer(a, ['buffered', 'external_loop'],
                    [['readwrite', 'nbo', 'aligned']],
                    casting='same_kind',
@@ -1886,9 +1893,10 @@ def test_iter_buffered_cast_byteswapped():
     assert_equal(a, 2*np.arange(10, dtype='f4'))
 
     with suppress_warnings() as sup:
-        sup.filter(np.ComplexWarning)
+        sup.filter(np.exceptions.ComplexWarning)
 
-        a = np.arange(10, dtype='f8').newbyteorder().byteswap()
+        a = np.arange(10, dtype='f8')
+        a = a.view(a.dtype.newbyteorder()).byteswap()
         i = nditer(a, ['buffered', 'external_loop'],
                        [['readwrite', 'nbo', 'aligned']],
                        casting='unsafe',
@@ -1903,7 +1911,8 @@ def test_iter_buffered_cast_byteswapped():
 def test_iter_buffered_cast_byteswapped_complex():
     # Test that buffering can handle a cast which requires swap->cast->copy
 
-    a = np.arange(10, dtype='c8').newbyteorder().byteswap()
+    a = np.arange(10, dtype='c8')
+    a = a.view(a.dtype.newbyteorder()).byteswap()
     a += 2j
     i = nditer(a, ['buffered', 'external_loop'],
                    [['readwrite', 'nbo', 'aligned']],
@@ -1927,7 +1936,8 @@ def test_iter_buffered_cast_byteswapped_complex():
             v[...] *= 2
     assert_equal(a, 2*np.arange(10, dtype='c8') + 4j)
 
-    a = np.arange(10, dtype=np.clongdouble).newbyteorder().byteswap()
+    a = np.arange(10, dtype=np.clongdouble)
+    a = a.view(a.dtype.newbyteorder()).byteswap()
     a += 2j
     i = nditer(a, ['buffered', 'external_loop'],
                    [['readwrite', 'nbo', 'aligned']],
@@ -1939,7 +1949,8 @@ def test_iter_buffered_cast_byteswapped_complex():
             v[...] *= 2
     assert_equal(a, 2*np.arange(10, dtype=np.clongdouble) + 4j)
 
-    a = np.arange(10, dtype=np.longdouble).newbyteorder().byteswap()
+    a = np.arange(10, dtype=np.longdouble)
+    a = a.view(a.dtype.newbyteorder()).byteswap()
     i = nditer(a, ['buffered', 'external_loop'],
                    [['readwrite', 'nbo', 'aligned']],
                    casting='same_kind',
@@ -2629,7 +2640,8 @@ def test_iter_buffering_reduction():
     # Test doing buffered reductions with the iterator
 
     a = np.arange(6)
-    b = np.array(0., dtype='f8').byteswap().newbyteorder()
+    b = np.array(0., dtype='f8').byteswap()
+    b = b.view(b.dtype.newbyteorder())
     i = nditer([a, b], ['reduce_ok', 'buffered'],
                     [['readonly'], ['readwrite', 'nbo']],
                     op_axes=[[0], [-1]])
@@ -2643,7 +2655,8 @@ def test_iter_buffering_reduction():
     assert_equal(b, np.sum(a))
 
     a = np.arange(6).reshape(2, 3)
-    b = np.array([0, 0], dtype='f8').byteswap().newbyteorder()
+    b = np.array([0, 0], dtype='f8').byteswap()
+    b = b.view(b.dtype.newbyteorder())
     i = nditer([a, b], ['reduce_ok', 'external_loop', 'buffered'],
                     [['readonly'], ['readwrite', 'nbo']],
                     op_axes=[[0, 1], [0, -1]])
@@ -3007,7 +3020,7 @@ def test_object_iter_cleanup():
     assert_raises(TypeError, lambda: np.zeros((17000, 2), dtype='f4') * None)
 
     # this more explicit code also triggers the invalid access
-    arr = np.arange(np.BUFSIZE * 10).reshape(10, -1).astype(str)
+    arr = np.arange(ncu.BUFSIZE * 10).reshape(10, -1).astype(str)
     oarr = arr.astype(object)
     oarr[:, -1] = None
     assert_raises(TypeError, lambda: np.add(oarr[:, ::-1], arr[:, ::-1]))
@@ -3088,7 +3101,8 @@ def test_iter_too_large_with_multiindex():
 
 def test_writebacks():
     a = np.arange(6, dtype='f4')
-    au = a.byteswap().newbyteorder()
+    au = a.byteswap()
+    au = au.view(au.dtype.newbyteorder())
     assert_(a.dtype.byteorder != au.dtype.byteorder)
     it = nditer(au, [], [['readwrite', 'updateifcopy']],
                         casting='equiv', op_dtypes=[np.dtype('f4')])
@@ -3191,7 +3205,8 @@ def test_close_parameters():
 @pytest.mark.skipif(not HAS_REFCOUNT, reason="Python lacks refcounts")
 def test_warn_noclose():
     a = np.arange(6, dtype='f4')
-    au = a.byteswap().newbyteorder()
+    au = a.byteswap()
+    au = au.view(au.dtype.newbyteorder())
     with suppress_warnings() as sup:
         sup.record(RuntimeWarning)
         it = np.nditer(au, [], [['readwrite', 'updateifcopy']],
@@ -3216,7 +3231,7 @@ def test_partial_iteration_cleanup(in_dtype, buf_dtype, steps):
     run e.g. with pytest-valgrind or pytest-leaks
     """
     value = 2**30 + 1  # just a random value that Python won't intern
-    arr = np.full(int(np.BUFSIZE * 2.5), value).astype(in_dtype)
+    arr = np.full(int(ncu.BUFSIZE * 2.5), value).astype(in_dtype)
 
     it = np.nditer(arr, op_dtypes=[np.dtype(buf_dtype)],
             flags=["buffered", "external_loop", "refs_ok"], casting="unsafe")
@@ -3241,11 +3256,11 @@ def test_partial_iteration_cleanup(in_dtype, buf_dtype, steps):
           ])
 def test_partial_iteration_error(in_dtype, buf_dtype):
     value = 123  # relies on python cache (leak-check will still find it)
-    arr = np.full(int(np.BUFSIZE * 2.5), value).astype(in_dtype)
+    arr = np.full(int(ncu.BUFSIZE * 2.5), value).astype(in_dtype)
     if in_dtype == "O":
-        arr[int(np.BUFSIZE * 1.5)] = None
+        arr[int(ncu.BUFSIZE * 1.5)] = None
     else:
-        arr[int(np.BUFSIZE * 1.5)]["f0"] = None
+        arr[int(ncu.BUFSIZE * 1.5)]["f0"] = None
 
     count = sys.getrefcount(value)
 

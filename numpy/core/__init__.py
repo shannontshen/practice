@@ -6,10 +6,11 @@ are available in the main ``numpy`` namespace - use that instead.
 
 """
 
-from numpy.version import version as __version__
-
 import os
 import warnings
+
+from numpy.version import version as __version__
+
 
 # disables OpenBLAS affinity setting of the main thread that limits
 # python threads or processes to one core
@@ -69,18 +70,15 @@ if not (hasattr(multiarray, '_multiarray_umath') and
     raise ImportError(msg.format(path))
 
 from . import numerictypes as nt
+from .numerictypes import sctypes, sctypeDict
 multiarray.set_typeDict(nt.sctypeDict)
 from . import numeric
 from .numeric import *
 from . import fromnumeric
 from .fromnumeric import *
-from . import defchararray as char
-from . import records
-from . import records as rec
-from .records import record, recarray, format_parser
+from .records import record, recarray
 # Note: module name memmap is overwritten by a class with same name
 from .memmap import *
-from .defchararray import chararray
 from . import function_base
 from .function_base import *
 from . import _machar
@@ -104,10 +102,8 @@ from . import _internal
 from . import _dtype
 from . import _methods
 
-__all__ = ['char', 'rec', 'memmap']
+__all__ = ['memmap', 'sctypeDict', 'record', 'recarray', 'abs']
 __all__ += numeric.__all__
-__all__ += ['record', 'recarray', 'format_parser']
-__all__ += ['chararray']
 __all__ += function_base.__all__
 __all__ += getlimits.__all__
 __all__ += shape_base.__all__
@@ -142,13 +138,14 @@ def _DType_reconstruct(scalar_type):
 
 
 def _DType_reduce(DType):
-    # To pickle a DType without having to add top-level names, pickle the
-    # scalar type for now (and assume that reconstruction will be possible).
-    if not DType._legacy:
-        # If we don't have a legacy DType, we should have a valid top level
-        # name available, so use it (i.e. `np.dtype` itself!)
+    # As types/classes, most DTypes can simply be pickled by their name:
+    if not DType._legacy or DType.__module__ == "numpy.dtypes":
         return DType.__name__
-    scalar_type = DType.type  # pickle the scalar type for reconstruction
+
+    # However, user defined legacy dtypes (like rational) do not end up in
+    # `numpy.dtypes` as module and do not have a public class at all.
+    # For these, we pickle them by reconstructing them from the scalar type:
+    scalar_type = DType.type
     return _DType_reconstruct, (scalar_type,)
 
 

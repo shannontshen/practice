@@ -1,9 +1,7 @@
-import datetime as dt
 from collections.abc import Sequence
-from typing import Union, Any, overload, TypeVar, Literal, SupportsIndex
+from typing import Any, overload, TypeVar, Literal, SupportsIndex
 
 from numpy import (
-    ndarray,
     number,
     uint64,
     int_,
@@ -21,6 +19,7 @@ from numpy import (
     _PartitionKind,
     _SortKind,
     _SortSide,
+    _CastingKind,
 )
 from numpy._typing import (
     DTypeLike,
@@ -392,7 +391,7 @@ def clip(
     order: _OrderKACF = ...,
     subok: bool = ...,
     signature: str | tuple[None | str, ...] = ...,
-    extobj: list[Any] = ...,
+    casting: _CastingKind = ...,
 ) -> _SCT: ...
 @overload
 def clip(
@@ -406,7 +405,7 @@ def clip(
     order: _OrderKACF = ...,
     subok: bool = ...,
     signature: str | tuple[None | str, ...] = ...,
-    extobj: list[Any] = ...,
+    casting: _CastingKind = ...,
 ) -> Any: ...
 @overload
 def clip(
@@ -420,7 +419,7 @@ def clip(
     order: _OrderKACF = ...,
     subok: bool = ...,
     signature: str | tuple[None | str, ...] = ...,
-    extobj: list[Any] = ...,
+    casting: _CastingKind = ...,
 ) -> NDArray[_SCT]: ...
 @overload
 def clip(
@@ -434,7 +433,7 @@ def clip(
     order: _OrderKACF = ...,
     subok: bool = ...,
     signature: str | tuple[None | str, ...] = ...,
-    extobj: list[Any] = ...,
+    casting: _CastingKind = ...,
 ) -> NDArray[Any]: ...
 @overload
 def clip(
@@ -448,7 +447,7 @@ def clip(
     order: _OrderKACF = ...,
     subok: bool = ...,
     signature: str | tuple[None | str, ...] = ...,
-    extobj: list[Any] = ...,
+    casting: _CastingKind = ...,
 ) -> Any: ...
 @overload
 def clip(
@@ -462,7 +461,7 @@ def clip(
     order: _OrderKACF = ...,
     subok: bool = ...,
     signature: str | tuple[None | str, ...] = ...,
-    extobj: list[Any] = ...,
+    casting: _CastingKind = ...,
 ) -> _ArrayType: ...
 
 @overload
@@ -1047,3 +1046,7 @@ def var(
     *,
     where: _ArrayLikeBool_co = ...,
 ) -> _ArrayType: ...
+
+max = amax
+min = amin
+round = around
