@@ -6,8 +6,10 @@ import pytest
 from os import path
 from io import BytesIO
 from itertools import chain
+import pickle
 
 import numpy as np
+from numpy.exceptions import AxisError, ComplexWarning
 from numpy.testing import (
         assert_, assert_equal, IS_PYPY, assert_almost_equal,
         assert_array_equal, assert_array_almost_equal, assert_raises,
@@ -15,7 +17,7 @@ from numpy.testing import (
         _assert_valid_refcount, HAS_REFCOUNT, IS_PYSTON, IS_WASM
         )
 from numpy.testing._private.utils import _no_tracing, requires_memory
-from numpy.compat import asbytes, asunicode, pickle
+from numpy._utils import asbytes, asunicode
 
 
 class TestRegression:
@@ -136,7 +138,7 @@ class TestRegression:
         ulen = 1
         ucs_value = '\U0010FFFF'
         ua = np.array([[[ucs_value*ulen]*2]*3]*4, dtype='U%s' % ulen)
-        ua.newbyteorder()  # Should succeed.
+        ua.view(ua.dtype.newbyteorder())  # Should succeed.
 
     def test_object_array_fill(self):
         # Ticket #86
@@ -275,7 +277,7 @@ class TestRegression:
 
     def test_numpy_float_python_long_addition(self):
         # Check that numpy float and python longs can be added correctly.
-        a = np.float_(23.) + 2**135
+        a = np.float64(23.) + 2**135
         assert_equal(a, 23. + 2**135)
 
     def test_binary_repr_0(self):
@@ -376,7 +378,7 @@ class TestRegression:
 
     def test_chararray_rstrip(self):
         # Ticket #222
-        x = np.chararray((1,), 5)
+        x = np.char.chararray((1,), 5)
         x[0] = b'a   '
         x = x.rstrip()
         assert_equal(x[0], b'a')
@@ -439,9 +441,9 @@ class TestRegression:
         assert np.lexsort((xs,), axis=0).shape[0] == 2
 
     def test_lexsort_invalid_axis(self):
-        assert_raises(np.AxisError, np.lexsort, (np.arange(1),), axis=2)
-        assert_raises(np.AxisError, np.lexsort, (np.array([]),), axis=1)
-        assert_raises(np.AxisError, np.lexsort, (np.array(1),), axis=10)
+        assert_raises(AxisError, np.lexsort, (np.arange(1),), axis=2)
+        assert_raises(AxisError, np.lexsort, (np.array([]),), axis=1)
+        assert_raises(AxisError, np.lexsort, (np.array(1),), axis=10)
 
     def test_lexsort_zerolen_element(self):
         dt = np.dtype([])  # a void dtype with no fields
@@ -517,7 +519,7 @@ class TestRegression:
         # Make sure methods and functions have same default axis
         # keyword and arguments
         funcs1 = ['argmax', 'argmin', 'sum', 'any', 'all', 'cumsum',
-                  'ptp', 'cumprod', 'prod', 'std', 'var', 'mean',
+                  'cumprod', 'prod', 'std', 'var', 'mean',
                   'round', 'min', 'max', 'argsort', 'sort']
         funcs2 = ['compress', 'take', 'repeat']
 
@@ -571,7 +573,7 @@ class TestRegression:
         x1 = np.array([[1, 2], [3, 4], [5, 6]])
         x2 = np.array(['a', 'dd', 'xyz'])
         x3 = np.array([1.1, 2, 3])
-        np.rec.fromarrays([x1, x2, x3], formats="(2,)i4,a3,f8")
+        np.rec.fromarrays([x1, x2, x3], formats="(2,)i4,S3,f8")
 
     def test_object_array_assign(self):
         x = np.empty((2, 2), object)
@@ -642,10 +644,6 @@ class TestRegression:
         a = np.ones((0, 2))
         a.shape = (-1, 2)
 
-    # Cannot test if NPY_RELAXED_STRIDES_DEBUG changes the strides.
-    # With NPY_RELAXED_STRIDES_DEBUG the test becomes superfluous.
-    @pytest.mark.skipif(np.ones(1).strides[0] == np.iinfo(np.intp).max,
-                        reason="Using relaxed stride debug")
     def test_reshape_trailing_ones_strides(self):
         # GitHub issue gh-2949, bad strides for trailing ones of new shape
         a = np.zeros(12, dtype=np.int32)[::2]  # not contiguous
@@ -902,17 +900,6 @@ class TestRegression:
         # Ticket #658
         np.indices((0, 3, 4)).T.reshape(-1, 3)
 
-    # Cannot test if NPY_RELAXED_STRIDES_DEBUG changes the strides.
-    # With NPY_RELAXED_STRIDES_DEBUG the test becomes superfluous,
-    # 0-sized reshape itself is tested elsewhere.
-    @pytest.mark.skipif(np.ones(1).strides[0] == np.iinfo(np.intp).max,
-                        reason="Using relaxed stride debug")
-    def test_copy_detection_corner_case2(self):
-        # Ticket #771: strides are not set correctly when reshaping 0-sized
-        # arrays
-        b = np.indices((0, 3, 4)).T.reshape(-1, 3)
-        assert_equal(b.strides, (3 * b.itemsize, b.itemsize))
-
     def test_object_array_refcounting(self):
         # Ticket #633
         if not hasattr(sys, 'getrefcount'):
@@ -1156,9 +1143,7 @@ class TestRegression:
         assert_(dat.max(1).info == 'jubba')
         assert_(dat.mean(1).info == 'jubba')
         assert_(dat.min(1).info == 'jubba')
-        assert_(dat.newbyteorder().info == 'jubba')
         assert_(dat.prod(1).info == 'jubba')
-        assert_(dat.ptp(1).info == 'jubba')
         assert_(dat.ravel().info == 'jubba')
         assert_(dat.real.info == 'jubba')
         assert_(dat.repeat(2).info == 'jubba')
@@ -1464,6 +1449,10 @@ class TestRegression:
         x[x.nonzero()] = x.ravel()[:1]
         assert_(x[0, 1] == x[0, 0])
 
+    @pytest.mark.skipif(
+        sys.version_info >= (3, 12),
+        reason="Python 3.12 has immortal refcounts, this test no longer works."
+    )
     @pytest.mark.skipif(not HAS_REFCOUNT, reason="Python lacks refcounts")
     def test_structured_arrays_with_objects2(self):
         # Ticket #1299 second test
@@ -1517,7 +1506,7 @@ class TestRegression:
             np.fromstring(b'aa, aa, 1.0', sep=',')
 
     def test_ticket_1539(self):
-        dtypes = [x for x in np.sctypeDict.values()
+        dtypes = [x for x in np.core.sctypeDict.values()
                   if (issubclass(x, np.number)
                       and not issubclass(x, np.timedelta64))]
         a = np.array([], np.bool_)  # not x[0] because it is unordered
@@ -1528,9 +1517,12 @@ class TestRegression:
             for y in dtypes:
                 c = a.astype(y)
                 try:
-                    np.dot(b, c)
+                    d = np.dot(b, c)
                 except TypeError:
                     failures.append((x, y))
+                else:
+                    if d != 0:
+                        failures.append((x, y))
         if failures:
             raise AssertionError("Failures: %r" % failures)
 
@@ -1620,9 +1612,9 @@ class TestRegression:
     def test_complex_scalar_warning(self):
         for tp in [np.csingle, np.cdouble, np.clongdouble]:
             x = tp(1+2j)
-            assert_warns(np.ComplexWarning, float, x)
+            assert_warns(ComplexWarning, float, x)
             with suppress_warnings() as sup:
-                sup.filter(np.ComplexWarning)
+                sup.filter(ComplexWarning)
                 assert_equal(float(x), float(x.real))
 
     def test_complex_scalar_complex_cast(self):
@@ -1659,12 +1651,9 @@ class TestRegression:
         a = np.array([0x80000000, 0x00000080, 0], dtype=np.uint32)
         a.dtype = np.float32
         assert_equal(a.nonzero()[0], [1])
-        a = a.byteswap().newbyteorder()
+        a = a.byteswap()
+        a = a.view(a.dtype.newbyteorder())
         assert_equal(a.nonzero()[0], [1])  # [0] if nonzero() ignores swap
-
-    def test_find_common_type_boolean(self):
-        # Ticket #1695
-        assert_(np.find_common_type([], ['?', '?']) == '?')
 
     def test_empty_mul(self):
         a = np.array([1.])
@@ -2089,7 +2078,7 @@ class TestRegression:
         a = np.array([('a', 1)], dtype='S1, int')
         assert_raises(TypeError, np.searchsorted, a, 1.2)
         # Ticket #2066, similar problem:
-        dtype = np.format_parser(['i4', 'i4'], [], [])
+        dtype = np.rec.format_parser(['i4', 'i4'], [], [])
         a = np.recarray((2,), dtype)
         a[...] = [(1, 2), (3, 4)]
         assert_raises(TypeError, np.searchsorted, a, 1)
@@ -2323,7 +2312,7 @@ class TestRegression:
 
     def test_correct_hash_dict(self):
         # gh-8887 - __hash__ would be None despite tp_hash being set
-        all_types = set(np.sctypeDict.values()) - {np.void}
+        all_types = set(np.core.sctypeDict.values()) - {np.void}
         for t in all_types:
             val = t()
 
@@ -2335,7 +2324,7 @@ class TestRegression:
                 assert_(t.__hash__ != None)
 
     def test_scalar_copy(self):
-        scalar_types = set(np.sctypeDict.values())
+        scalar_types = set(np.core.sctypeDict.values())
         values = {
             np.void: b"a",
             np.bytes_: b"a",
@@ -2557,3 +2546,12 @@ class TestRegression:
         expected = np.ones(size, dtype=np.bool_)
         assert_array_equal(np.logical_and(a, b), expected)
 
+    @pytest.mark.skipif(IS_PYPY, reason="PyPy issue 2742")
+    def test_gh_23737(self):
+        with pytest.raises(TypeError, match="not an acceptable base type"):
+            class Y(np.flexible):
+                pass
+
+        with pytest.raises(TypeError, match="not an acceptable base type"):
+            class X(np.flexible, np.ma.core.MaskedArray):
+                pass

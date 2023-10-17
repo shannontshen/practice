@@ -461,7 +461,7 @@ So:
 ``__array_ufunc__`` for ufuncs
 ==============================
 
-  .. versionadded:: 1.13
+.. versionadded:: 1.13
 
 A subclass can override what happens when executing numpy ufuncs on it by
 overriding the default ``ndarray.__array_ufunc__`` method. This method is
@@ -473,15 +473,15 @@ The signature of ``__array_ufunc__`` is::
 
     def __array_ufunc__(ufunc, method, *inputs, **kwargs):
 
-    - *ufunc* is the ufunc object that was called.
-    - *method* is a string indicating how the Ufunc was called, either
-      ``"__call__"`` to indicate it was called directly, or one of its
-      :ref:`methods<ufuncs.methods>`: ``"reduce"``, ``"accumulate"``,
-      ``"reduceat"``, ``"outer"``, or ``"at"``.
-    - *inputs* is a tuple of the input arguments to the ``ufunc``
-    - *kwargs* contains any optional or keyword arguments passed to the
-      function. This includes any ``out`` arguments, which are always
-      contained in a tuple.
+- *ufunc* is the ufunc object that was called.
+- *method* is a string indicating how the Ufunc was called, either
+  ``"__call__"`` to indicate it was called directly, or one of its
+  :ref:`methods<ufuncs.methods>`: ``"reduce"``, ``"accumulate"``,
+  ``"reduceat"``, ``"outer"``, or ``"at"``.
+- *inputs* is a tuple of the input arguments to the ``ufunc``
+- *kwargs* contains any optional or keyword arguments passed to the
+  function. This includes any ``out`` arguments, which are always
+  contained in a tuple.
 
 A typical implementation would convert any inputs or outputs that are
 instances of one's own class, pass everything on to a superclass using
@@ -569,7 +569,7 @@ which inputs and outputs it converted. Hence, e.g.,
 Note that another approach would be to use ``getattr(ufunc,
 methods)(*inputs, **kwargs)`` instead of the ``super`` call. For this example,
 the result would be identical, but there is a difference if another operand
-also defines ``__array_ufunc__``. E.g., lets assume that we evalulate
+also defines ``__array_ufunc__``. E.g., lets assume that we evaluate
 ``np.add(a, b)``, where ``b`` is an instance of another class ``B`` that has
 an override.  If you use ``super`` as in the example,
 ``ndarray.__array_ufunc__`` will notice that ``b`` has an override, which

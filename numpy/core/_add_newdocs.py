@@ -5,7 +5,7 @@ requiring a re-compile.
 
 NOTE: Many of the methods of ndarray have corresponding functions.
       If you update these docstrings, please keep also the ones in
-      core/fromnumeric.py, core/defmatrix.py up-to-date.
+      core/fromnumeric.py, matrixlib/defmatrix.py up-to-date.
 
 """
 
@@ -390,7 +390,8 @@ add_newdoc('numpy.core', 'nditer',
     `WRITEBACKIFCOPY` flag. In this case `nditer` must be used as a
     context manager or the `nditer.close` method must be called before
     using the result. The temporary data will be written back to the
-    original data when the `__exit__` function is called but not before:
+    original data when the :meth:`~object.__exit__` function is called
+    but not before:
 
     >>> a = np.arange(6, dtype='i4')[::-2]
     >>> with np.nditer(a, [],
@@ -897,11 +898,11 @@ add_newdoc('numpy.core.multiarray', 'array',
 
     Creating an array from sub-classes:
 
-    >>> np.array(np.mat('1 2; 3 4'))
+    >>> np.array(np.asmatrix('1 2; 3 4'))
     array([[1, 2],
            [3, 4]])
 
-    >>> np.array(np.mat('1 2; 3 4'), subok=True)
+    >>> np.array(np.asmatrix('1 2; 3 4'), subok=True)
     matrix([[1, 2],
             [3, 4]])
 
@@ -946,7 +947,6 @@ add_newdoc('numpy.core.multiarray', 'asarray',
     --------
     asanyarray : Similar function which passes through subclasses.
     ascontiguousarray : Convert input to a contiguous array.
-    asfarray : Convert input to a floating point ndarray.
     asfortranarray : Convert input to an ndarray with column-major
                      memory order.
     asarray_chkfinite : Similar function which checks input for NaNs and Infs.
@@ -971,16 +971,16 @@ add_newdoc('numpy.core.multiarray', 'asarray',
     If `dtype` is set, array is copied only if dtype does not match:
 
     >>> a = np.array([1, 2], dtype=np.float32)
-    >>> np.asarray(a, dtype=np.float32) is a
+    >>> np.shares_memory(np.asarray(a, dtype=np.float32), a)
     True
-    >>> np.asarray(a, dtype=np.float64) is a
+    >>> np.shares_memory(np.asarray(a, dtype=np.float64), a)
     False
 
     Contrary to `asanyarray`, ndarray subclasses are not passed through:
 
     >>> issubclass(np.recarray, np.ndarray)
     True
-    >>> a = np.array([(1.0, 2), (3.0, 4)], dtype='f4,i4').view(np.recarray)
+    >>> a = np.array([(1., 2), (3., 4)], dtype='f4,i4').view(np.recarray)
     >>> np.asarray(a) is a
     False
     >>> np.asanyarray(a) is a
@@ -1026,7 +1026,6 @@ add_newdoc('numpy.core.multiarray', 'asanyarray',
     --------
     asarray : Similar function which always returns ndarrays.
     ascontiguousarray : Convert input to a contiguous array.
-    asfarray : Convert input to a floating point ndarray.
     asfortranarray : Convert input to an ndarray with column-major
                      memory order.
     asarray_chkfinite : Similar function which checks input for NaNs and
@@ -1045,7 +1044,7 @@ add_newdoc('numpy.core.multiarray', 'asanyarray',
 
     Instances of `ndarray` subclasses are passed through as-is:
 
-    >>> a = np.array([(1.0, 2), (3.0, 4)], dtype='f4,i4').view(np.recarray)
+    >>> a = np.array([(1., 2), (3., 4)], dtype='f4,i4').view(np.recarray)
     >>> np.asanyarray(a) is a
     True
 
@@ -1393,7 +1392,7 @@ add_newdoc('numpy.core.multiarray', 'compare_chararrays',
     compare_chararrays(a1, a2, cmp, rstrip)
 
     Performs element-wise comparison of two string arrays using the
-    comparison operator specified by `cmp_op`.
+    comparison operator specified by `cmp`.
 
     Parameters
     ----------
@@ -1412,7 +1411,7 @@ add_newdoc('numpy.core.multiarray', 'compare_chararrays',
     Raises
     ------
     ValueError
-        If `cmp_op` is not valid.
+        If `cmp` is not valid.
     TypeError
         If at least one of `a` or `b` is a non-string array
 
@@ -1420,7 +1419,7 @@ add_newdoc('numpy.core.multiarray', 'compare_chararrays',
     --------
     >>> a = np.array(["a", "b", "cde"])
     >>> b = np.array(["a", "a", "dec"])
-    >>> np.compare_chararrays(a, b, ">", True)
+    >>> np.char.compare_chararrays(a, b, ">", True)
     array([False,  True, False])
 
     """)
@@ -1673,16 +1672,6 @@ add_newdoc('numpy.core.multiarray', 'from_dlpack',
     >>> y = np.from_dlpack(x)
     """)
 
-add_newdoc('numpy.core', 'fastCopyAndTranspose',
-    """
-    fastCopyAndTranspose(a)
-
-    .. deprecated:: 1.24
-
-       fastCopyAndTranspose is deprecated and will be removed. Use the copy and
-       transpose methods instead, e.g. ``arr.T.copy()``
-    """)
-
 add_newdoc('numpy.core.multiarray', 'correlate',
     """cross_correlate(a,v, mode=0)""")
 
@@ -1819,56 +1808,6 @@ add_newdoc('numpy.core.multiarray', 'set_string_function',
     set_string_function(f, repr=1)
 
     Internal method to set a function to be used when pretty printing arrays.
-
-    """)
-
-add_newdoc('numpy.core.multiarray', 'set_numeric_ops',
-    """
-    set_numeric_ops(op1=func1, op2=func2, ...)
-
-    Set numerical operators for array objects.
-
-    .. deprecated:: 1.16
-
-        For the general case, use :c:func:`PyUFunc_ReplaceLoopBySignature`.
-        For ndarray subclasses, define the ``__array_ufunc__`` method and
-        override the relevant ufunc.
-
-    Parameters
-    ----------
-    op1, op2, ... : callable
-        Each ``op = func`` pair describes an operator to be replaced.
-        For example, ``add = lambda x, y: np.add(x, y) % 5`` would replace
-        addition by modulus 5 addition.
-
-    Returns
-    -------
-    saved_ops : list of callables
-        A list of all operators, stored before making replacements.
-
-    Notes
-    -----
-    .. warning::
-       Use with care!  Incorrect usage may lead to memory errors.
-
-    A function replacing an operator cannot make use of that operator.
-    For example, when replacing add, you may not use ``+``.  Instead,
-    directly call ufuncs.
-
-    Examples
-    --------
-    >>> def add_mod5(x, y):
-    ...     return np.add(x, y) % 5
-    ...
-    >>> old_funcs = np.set_numeric_ops(add=add_mod5)
-
-    >>> x = np.arange(12).reshape((3, 4))
-    >>> x + x
-    array([[0, 2, 4, 1],
-           [3, 0, 2, 4],
-           [1, 3, 0, 2]])
-
-    >>> ignore = np.set_numeric_ops(**old_funcs) # restore operators
 
     """)
 
@@ -2839,8 +2778,8 @@ add_newdoc('numpy.core.multiarray', 'ndarray', ('strides',
 
         offset = sum(np.array(i) * a.strides)
 
-    A more detailed explanation of strides can be found in the
-    "ndarray.rst" file in the NumPy reference guide.
+    A more detailed explanation of strides can be found in
+    :ref:`arrays.ndarray`.
 
     .. warning::
 
@@ -2927,6 +2866,45 @@ add_newdoc('numpy.core.multiarray', 'ndarray', ('T',
     """))
 
 
+add_newdoc('numpy.core.multiarray', 'ndarray', ('mT',
+    """
+    View of the matrix transposed array.
+    
+    The matrix transpose is the transpose of the last two dimensions, even
+    if the array is of higher dimension.
+
+    .. versionadded:: 2.0
+
+    Raises
+    ------
+    ValueError
+        If the array is of dimension less than 2.
+        
+    Examples
+    --------
+    >>> a = np.array([[1, 2], [3, 4]])
+    >>> a
+    array([[1, 2],
+           [3, 4]])
+    >>> a.mT
+    array([[1, 3],
+           [2, 4]])
+           
+    >>> a = np.arange(8).reshape((2, 2, 2))
+    >>> a
+    array([[[0, 1],
+            [2, 3]],
+    <BLANKLINE>
+           [[4, 5],
+            [6, 7]]])
+    >>> a.mT
+    array([[[0, 2],
+            [1, 3]],
+    <BLANKLINE>
+           [[4, 6],
+            [5, 7]]])
+    
+    """))
 ##############################################################################
 #
 # ndarray methods
@@ -3157,12 +3135,12 @@ add_newdoc('numpy.core.multiarray', 'ndarray', ('astype',
         Controls what kind of data casting may occur. Defaults to 'unsafe'
         for backwards compatibility.
 
-          * 'no' means the data types should not be cast at all.
-          * 'equiv' means only byte-order changes are allowed.
-          * 'safe' means only casts which can preserve values are allowed.
-          * 'same_kind' means only safe casts or casts within a kind,
-            like float64 to float32, are allowed.
-          * 'unsafe' means any data conversions may be done.
+        * 'no' means the data types should not be cast at all.
+        * 'equiv' means only byte-order changes are allowed.
+        * 'safe' means only casts which can preserve values are allowed.
+        * 'same_kind' means only safe casts or casts within a kind,
+          like float64 to float32, are allowed.
+        * 'unsafe' means any data conversions may be done.
     subok : bool, optional
         If True, then sub-classes will be passed-through (default), otherwise
         the returned array will be forced to be a base-class array.
@@ -3248,14 +3226,14 @@ add_newdoc('numpy.core.multiarray', 'ndarray', ('byteswap',
     >>> A.byteswap()
     array([b'ceg', b'fac'], dtype='|S3')
 
-    ``A.newbyteorder().byteswap()`` produces an array with the same values
-      but different representation in memory
+    ``A.view(A.dtype.newbyteorder()).byteswap()`` produces an array with
+    the same values but different representation in memory
 
     >>> A = np.array([1, 2, 3])
     >>> A.view(np.uint8)
     array([1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0,
            0, 0], dtype=uint8)
-    >>> A.newbyteorder().byteswap(inplace=True)
+    >>> A.view(A.dtype.newbyteorder()).byteswap(inplace=True)
     array([1, 2, 3])
     >>> A.view(np.uint8)
     array([0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0,
@@ -3652,53 +3630,6 @@ add_newdoc('numpy.core.multiarray', 'ndarray', ('item',
     """))
 
 
-add_newdoc('numpy.core.multiarray', 'ndarray', ('itemset',
-    """
-    a.itemset(*args)
-
-    Insert scalar into an array (scalar is cast to array's dtype, if possible)
-
-    There must be at least 1 argument, and define the last argument
-    as *item*.  Then, ``a.itemset(*args)`` is equivalent to but faster
-    than ``a[args] = item``.  The item should be a scalar value and `args`
-    must select a single item in the array `a`.
-
-    Parameters
-    ----------
-    \\*args : Arguments
-        If one argument: a scalar, only used in case `a` is of size 1.
-        If two arguments: the last argument is the value to be set
-        and must be a scalar, the first argument specifies a single array
-        element location. It is either an int or a tuple.
-
-    Notes
-    -----
-    Compared to indexing syntax, `itemset` provides some speed increase
-    for placing a scalar into a particular location in an `ndarray`,
-    if you must do this.  However, generally this is discouraged:
-    among other problems, it complicates the appearance of the code.
-    Also, when using `itemset` (and `item`) inside a loop, be sure
-    to assign the methods to a local variable to avoid the attribute
-    look-up at each loop iteration.
-
-    Examples
-    --------
-    >>> np.random.seed(123)
-    >>> x = np.random.randint(9, size=(3, 3))
-    >>> x
-    array([[2, 2, 6],
-           [1, 3, 6],
-           [1, 0, 1]])
-    >>> x.itemset(4, 0)
-    >>> x.itemset((2, 2), 9)
-    >>> x
-    array([[2, 2, 6],
-           [1, 0, 6],
-           [1, 0, 9]])
-
-    """))
-
-
 add_newdoc('numpy.core.multiarray', 'ndarray', ('max',
     """
     a.max(axis=None, out=None, keepdims=False, initial=<no value>, where=True)
@@ -3744,46 +3675,6 @@ add_newdoc('numpy.core.multiarray', 'ndarray', ('min',
     """))
 
 
-add_newdoc('numpy.core.multiarray', 'ndarray', ('newbyteorder',
-    """
-    arr.newbyteorder(new_order='S', /)
-
-    Return the array with the same data viewed with a different byte order.
-
-    Equivalent to::
-
-        arr.view(arr.dtype.newbytorder(new_order))
-
-    Changes are also made in all fields and sub-arrays of the array data
-    type.
-
-
-
-    Parameters
-    ----------
-    new_order : string, optional
-        Byte order to force; a value from the byte order specifications
-        below. `new_order` codes can be any of:
-
-        * 'S' - swap dtype from current to opposite endian
-        * {'<', 'little'} - little endian
-        * {'>', 'big'} - big endian
-        * {'=', 'native'} - native order, equivalent to `sys.byteorder`
-        * {'|', 'I'} - ignore (no change to byte order)
-
-        The default value ('S') results in swapping the current
-        byte order.
-
-
-    Returns
-    -------
-    new_arr : array
-        New array object with the dtype reflecting given change to the
-        byte order.
-
-    """))
-
-
 add_newdoc('numpy.core.multiarray', 'ndarray', ('nonzero',
     """
     a.nonzero()
@@ -3810,21 +3701,6 @@ add_newdoc('numpy.core.multiarray', 'ndarray', ('prod',
     See Also
     --------
     numpy.prod : equivalent function
-
-    """))
-
-
-add_newdoc('numpy.core.multiarray', 'ndarray', ('ptp',
-    """
-    a.ptp(axis=None, out=None, keepdims=False)
-
-    Peak to peak (maximum - minimum) value along a given axis.
-
-    Refer to `numpy.ptp` for full documentation.
-
-    See Also
-    --------
-    numpy.ptp : equivalent function
 
     """))
 
@@ -4081,7 +3957,7 @@ add_newdoc('numpy.core.multiarray', 'ndarray', ('setflags',
     These Boolean-valued flags affect how numpy interprets the memory
     area used by `a` (see Notes below). The ALIGNED flag can only
     be set to True if the data is actually aligned according to the type.
-    The WRITEBACKIFCOPY and flag can never be set
+    The WRITEBACKIFCOPY flag can never be set
     to True. The flag WRITEABLE can only be set to True if the array owns its
     own memory, or the ultimate owner of the memory exposes a writeable buffer
     interface, or is a string. (The exception for string is made so that
@@ -4100,7 +3976,7 @@ add_newdoc('numpy.core.multiarray', 'ndarray', ('setflags',
     -----
     Array flags provide information about how the memory area used
     for the array is to be interpreted. There are 7 Boolean flags
-    in use, only four of which can be changed by the user:
+    in use, only three of which can be changed by the user:
     WRITEBACKIFCOPY, WRITEABLE, and ALIGNED.
 
     WRITEABLE (W) the data area can be written to;
@@ -4261,7 +4137,7 @@ add_newdoc('numpy.core.multiarray', 'ndarray', ('partition',
     >>> a = np.array([3, 4, 2, 1])
     >>> a.partition(3)
     >>> a
-    array([2, 1, 3, 4])
+    array([2, 1, 3, 4]) # may vary
 
     >>> a.partition((1, 3))
     >>> a
@@ -4497,9 +4373,10 @@ add_newdoc('numpy.core.multiarray', 'ndarray', ('tobytes', """
 add_newdoc('numpy.core.multiarray', 'ndarray', ('tostring', r"""
     a.tostring(order='C')
 
-    A compatibility alias for `tobytes`, with exactly the same behavior.
+    A compatibility alias for `~ndarray.tobytes`, with exactly the same
+    behavior.
 
-    Despite its name, it returns `bytes` not `str`\ s.
+    Despite its name, it returns :class:`bytes` not :class:`str`\ s.
 
     .. deprecated:: 1.19.0
     """))
@@ -4600,7 +4477,7 @@ add_newdoc('numpy.core.multiarray', 'ndarray', ('view',
     .. note::
         Passing None for ``dtype`` is different from omitting the parameter,
         since the former invokes ``dtype(None)`` which is an alias for
-        ``dtype('float_')``.
+        ``dtype('float64')``.
 
     Parameters
     ----------
@@ -4674,7 +4551,7 @@ add_newdoc('numpy.core.multiarray', 'ndarray', ('view',
 
     >>> x[0] = (9, 10)
     >>> z[0]
-    (9, 10)
+    np.record((9, 10), dtype=[('a', 'i1'), ('b', 'i1')])
 
     Views that change the dtype size (bytes per entry) should normally be
     avoided on arrays defined by slices, transposes, fortran-ordering, etc.:
@@ -4763,129 +4640,6 @@ add_newdoc('numpy.core.umath', 'frompyfunc',
     array(['0o12', '0o36', '0o144'], dtype=object)
     >>> np.array((oct(10), oct(30), oct(100))) # for comparison
     array(['0o12', '0o36', '0o144'], dtype='<U5')
-
-    """)
-
-add_newdoc('numpy.core.umath', 'geterrobj',
-    """
-    geterrobj()
-
-    Return the current object that defines floating-point error handling.
-
-    The error object contains all information that defines the error handling
-    behavior in NumPy. `geterrobj` is used internally by the other
-    functions that get and set error handling behavior (`geterr`, `seterr`,
-    `geterrcall`, `seterrcall`).
-
-    Returns
-    -------
-    errobj : list
-        The error object, a list containing three elements:
-        [internal numpy buffer size, error mask, error callback function].
-
-        The error mask is a single integer that holds the treatment information
-        on all four floating point errors. The information for each error type
-        is contained in three bits of the integer. If we print it in base 8, we
-        can see what treatment is set for "invalid", "under", "over", and
-        "divide" (in that order). The printed string can be interpreted with
-
-        * 0 : 'ignore'
-        * 1 : 'warn'
-        * 2 : 'raise'
-        * 3 : 'call'
-        * 4 : 'print'
-        * 5 : 'log'
-
-    See Also
-    --------
-    seterrobj, seterr, geterr, seterrcall, geterrcall
-    getbufsize, setbufsize
-
-    Notes
-    -----
-    For complete documentation of the types of floating-point exceptions and
-    treatment options, see `seterr`.
-
-    Examples
-    --------
-    >>> np.geterrobj()  # first get the defaults
-    [8192, 521, None]
-
-    >>> def err_handler(type, flag):
-    ...     print("Floating point error (%s), with flag %s" % (type, flag))
-    ...
-    >>> old_bufsize = np.setbufsize(20000)
-    >>> old_err = np.seterr(divide='raise')
-    >>> old_handler = np.seterrcall(err_handler)
-    >>> np.geterrobj()
-    [8192, 521, <function err_handler at 0x91dcaac>]
-
-    >>> old_err = np.seterr(all='ignore')
-    >>> np.base_repr(np.geterrobj()[1], 8)
-    '0'
-    >>> old_err = np.seterr(divide='warn', over='log', under='call',
-    ...                     invalid='print')
-    >>> np.base_repr(np.geterrobj()[1], 8)
-    '4351'
-
-    """)
-
-add_newdoc('numpy.core.umath', 'seterrobj',
-    """
-    seterrobj(errobj, /)
-
-    Set the object that defines floating-point error handling.
-
-    The error object contains all information that defines the error handling
-    behavior in NumPy. `seterrobj` is used internally by the other
-    functions that set error handling behavior (`seterr`, `seterrcall`).
-
-    Parameters
-    ----------
-    errobj : list
-        The error object, a list containing three elements:
-        [internal numpy buffer size, error mask, error callback function].
-
-        The error mask is a single integer that holds the treatment information
-        on all four floating point errors. The information for each error type
-        is contained in three bits of the integer. If we print it in base 8, we
-        can see what treatment is set for "invalid", "under", "over", and
-        "divide" (in that order). The printed string can be interpreted with
-
-        * 0 : 'ignore'
-        * 1 : 'warn'
-        * 2 : 'raise'
-        * 3 : 'call'
-        * 4 : 'print'
-        * 5 : 'log'
-
-    See Also
-    --------
-    geterrobj, seterr, geterr, seterrcall, geterrcall
-    getbufsize, setbufsize
-
-    Notes
-    -----
-    For complete documentation of the types of floating-point exceptions and
-    treatment options, see `seterr`.
-
-    Examples
-    --------
-    >>> old_errobj = np.geterrobj()  # first get the defaults
-    >>> old_errobj
-    [8192, 521, None]
-
-    >>> def err_handler(type, flag):
-    ...     print("Floating point error (%s), with flag %s" % (type, flag))
-    ...
-    >>> new_errobj = [20000, 12, err_handler]
-    >>> np.seterrobj(new_errobj)
-    >>> np.base_repr(12, 8)  # int for divide=4 ('print') and over=1 ('warn')
-    '14'
-    >>> np.geterr()
-    {'over': 'warn', 'divide': 'print', 'invalid': 'ignore', 'under': 'ignore'}
-    >>> np.geterrcall() is err_handler
-    True
 
     """)
 
@@ -5243,10 +4997,10 @@ add_newdoc('numpy.core', 'ufunc', ('signature',
 
     Examples
     --------
-    >>> np.core.umath_tests.matrix_multiply.signature
-    '(m,n),(n,p)->(m,p)'
     >>> np.linalg._umath_linalg.det.signature
     '(m,m)->()'
+    >>> np.matmul.signature
+    '(n?,k),(k,m?)->(n?,m?)'
     >>> np.add.signature is None
     True  # equivalent to '(),()->()'
     """))
@@ -5740,11 +5494,6 @@ add_newdoc('numpy.core', 'ufunc', ('resolve_dtypes',
         The dtypes which NumPy would use for the calculation.  Note that
         dtypes may not match the passed in ones (casting is necessary).
 
-    See Also
-    --------
-    numpy.ufunc._resolve_dtypes_and_context :
-        Similar function to this, but returns additional information which
-        give access to the core C functionality of NumPy.
 
     Examples
     --------
@@ -5753,7 +5502,7 @@ add_newdoc('numpy.core', 'ufunc', ('resolve_dtypes',
     >>> int32 = np.dtype("int32")
     >>> float32 = np.dtype("float32")
 
-    The typical ufunc call does not pass an output dtype.  `np.add` has two
+    The typical ufunc call does not pass an output dtype.  `numpy.add` has two
     inputs and one output, so leave the output as ``None`` (not provided):
 
     >>> np.add.resolve_dtypes((int32, float32, None))
@@ -5870,7 +5619,7 @@ add_newdoc('numpy.core', 'ufunc', ('_get_strided_loop',
 
 add_newdoc('numpy.core.multiarray', 'dtype',
     """
-    dtype(dtype, align=False, copy=False)
+    dtype(dtype, align=False, copy=False, [metadata])
 
     Create a data type object.
 
@@ -5890,6 +5639,8 @@ add_newdoc('numpy.core.multiarray', 'dtype',
     copy : bool, optional
         Make a new copy of the data-type object. If ``False``, the result
         may just be a reference to a built-in data-type object.
+    metadata : dict, optional
+        An optional dictionary with dtype metadata.
 
     See also
     --------
@@ -6009,8 +5760,8 @@ add_newdoc('numpy.core.multiarray', 'dtype', ('byteorder',
     >>> # '=' is the byteorder
     >>> import sys
     >>> sys_is_le = sys.byteorder == 'little'
-    >>> native_code = sys_is_le and '<' or '>'
-    >>> swapped_code = sys_is_le and '>' or '<'
+    >>> native_code = '<' if sys_is_le else '>'
+    >>> swapped_code = '>' if sys_is_le else '<'
     >>> dt = np.dtype(native_code + 'i2')
     >>> dt.byteorder
     '='
@@ -6041,7 +5792,7 @@ add_newdoc('numpy.core.multiarray', 'dtype', ('descr',
     `__array_interface__` attribute.
 
     Warning: This attribute exists specifically for `__array_interface__`,
-    and passing it directly to `np.dtype` will not accurately reconstruct
+    and passing it directly to `numpy.dtype` will not accurately reconstruct
     some dtypes (e.g., scalar and subarray dtypes).
 
     Examples
@@ -6089,7 +5840,7 @@ add_newdoc('numpy.core.multiarray', 'dtype', ('flags',
     """
     Bit-flags describing how this data type is to be interpreted.
 
-    Bit-masks are in `numpy.core.multiarray` as the constants
+    Bit-masks are in ``numpy.core.multiarray`` as the constants
     `ITEM_HASOBJECT`, `LIST_PICKLE`, `ITEM_IS_POINTER`, `NEEDS_INIT`,
     `NEEDS_PYAPI`, `USE_GETITEM`, `USE_SETITEM`. A full explanation
     of these flags is in C-API documentation; they are largely useful
@@ -6449,8 +6200,8 @@ add_newdoc('numpy.core.multiarray', 'dtype', ('newbyteorder',
     --------
     >>> import sys
     >>> sys_is_le = sys.byteorder == 'little'
-    >>> native_code = sys_is_le and '<' or '>'
-    >>> swapped_code = sys_is_le and '>' or '<'
+    >>> native_code = '<' if sys_is_le else '>'
+    >>> swapped_code = '>' if sys_is_le else '<'
     >>> native_dt = np.dtype(native_code+'i2')
     >>> swapped_dt = np.dtype(swapped_code+'i2')
     >>> native_dt.newbyteorder('S') == swapped_dt
@@ -6616,10 +6367,13 @@ add_newdoc('numpy.core.multiarray', 'busdaycalendar',
 
     Attributes
     ----------
-    Note: once a busdaycalendar object is created, you cannot modify the
-    weekmask or holidays.  The attributes return copies of internal data.
     weekmask : (copy) seven-element array of bool
     holidays : (copy) sorted array of datetime64[D]
+
+    Notes
+    -----
+    Once a busdaycalendar object is created, you cannot modify the
+    weekmask or holidays.  The attributes return copies of internal data.
 
     Examples
     --------
@@ -6783,9 +6537,6 @@ add_newdoc('numpy.core.numerictypes', 'generic', ('imag',
 add_newdoc('numpy.core.numerictypes', 'generic', ('itemsize',
     """The length of one element in bytes."""))
 
-add_newdoc('numpy.core.numerictypes', 'generic', ('nbytes',
-    """The length of the scalar in bytes."""))
-
 add_newdoc('numpy.core.numerictypes', 'generic', ('ndim',
     """The number of array dimensions."""))
 
@@ -6867,9 +6618,6 @@ add_newdoc('numpy.core.numerictypes', 'generic',
            refer_to_array_attribute('item'))
 
 add_newdoc('numpy.core.numerictypes', 'generic',
-           refer_to_array_attribute('itemset'))
-
-add_newdoc('numpy.core.numerictypes', 'generic',
            refer_to_array_attribute('max'))
 
 add_newdoc('numpy.core.numerictypes', 'generic',
@@ -6878,45 +6626,11 @@ add_newdoc('numpy.core.numerictypes', 'generic',
 add_newdoc('numpy.core.numerictypes', 'generic',
            refer_to_array_attribute('min'))
 
-add_newdoc('numpy.core.numerictypes', 'generic', ('newbyteorder',
-    """
-    newbyteorder(new_order='S', /)
-
-    Return a new `dtype` with a different byte order.
-
-    Changes are also made in all fields and sub-arrays of the data type.
-
-    The `new_order` code can be any from the following:
-
-    * 'S' - swap dtype from current to opposite endian
-    * {'<', 'little'} - little endian
-    * {'>', 'big'} - big endian
-    * {'=', 'native'} - native order
-    * {'|', 'I'} - ignore (no change to byte order)
-
-    Parameters
-    ----------
-    new_order : str, optional
-        Byte order to force; a value from the byte order specifications
-        above.  The default value ('S') results in swapping the current
-        byte order.
-
-
-    Returns
-    -------
-    new_dtype : dtype
-        New `dtype` object with the given change to the byte order.
-
-    """))
-
 add_newdoc('numpy.core.numerictypes', 'generic',
            refer_to_array_attribute('nonzero'))
 
 add_newdoc('numpy.core.numerictypes', 'generic',
            refer_to_array_attribute('prod'))
-
-add_newdoc('numpy.core.numerictypes', 'generic',
-           refer_to_array_attribute('ptp'))
 
 add_newdoc('numpy.core.numerictypes', 'generic',
            refer_to_array_attribute('put'))
@@ -7066,7 +6780,7 @@ add_newdoc('numpy.core.numerictypes', 'complexfloating',
 add_newdoc('numpy.core.numerictypes', 'flexible',
     """
     Abstract base class of all scalar types without predefined length.
-    The actual size of these types depends on the specific `np.dtype`
+    The actual size of these types depends on the specific `numpy.dtype`
     instantiation.
 
     """)

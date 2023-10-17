@@ -24,7 +24,7 @@
  *
  * Floor division of signed is based on T. Granlund and P. L. Montgomery
  * "Division by invariant integers using multiplication(see [Figure 6.1]
- * http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.1.2556)"
+ * https://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.1.2556)"
  * For details on TRUNC division see simd/intdiv.h for more clarification
  ***********************************************************************************
  ** Figure 6.1: Signed division by run-time invariant divisor, rounded towards -INF
@@ -400,14 +400,19 @@ NPY_NO_EXPORT int NPY_CPU_DISPATCH_CURFX(@TYPE@_divide_indexed)
 (PyArrayMethod_Context *NPY_UNUSED(context), char * const*args, npy_intp const *dimensions, npy_intp const *steps, NpyAuxData *NPY_UNUSED(func))
 {
     char *ip1 = args[0];
-    char *indx = args[1];
+    char *indxp = args[1];
     char *value = args[2];
     npy_intp is1 = steps[0], isindex = steps[1], isb = steps[2];
+    npy_intp shape = steps[3];
     npy_intp n = dimensions[0];
     npy_intp i;
     @type@ *indexed;
-    for(i = 0; i < n; i++, indx += isindex, value += isb) {
-        indexed = (@type@ *)(ip1 + is1 * *(npy_intp *)indx);
+    for(i = 0; i < n; i++, indxp += isindex, value += isb) {
+        npy_intp indx = *(npy_intp *)indxp;
+        if (indx < 0) {
+            indx += shape;
+        }
+        indexed = (@type@ *)(ip1 + is1 * indx);
         *indexed = floor_div_@TYPE@(*indexed, *(@type@ *)value);
     }
     return 0;
@@ -486,14 +491,19 @@ NPY_NO_EXPORT int NPY_CPU_DISPATCH_CURFX(@TYPE@_divide_indexed)
 (PyArrayMethod_Context *NPY_UNUSED(context), char * const*args, npy_intp const *dimensions, npy_intp const *steps, NpyAuxData *NPY_UNUSED(func))
 {
     char *ip1 = args[0];
-    char *indx = args[1];
+    char *indxp = args[1];
     char *value = args[2];
     npy_intp is1 = steps[0], isindex = steps[1], isb = steps[2];
+    npy_intp shape = steps[3];
     npy_intp n = dimensions[0];
     npy_intp i;
     @type@ *indexed;
-    for(i = 0; i < n; i++, indx += isindex, value += isb) {
-        indexed = (@type@ *)(ip1 + is1 * *(npy_intp *)indx);
+    for(i = 0; i < n; i++, indxp += isindex, value += isb) {
+        npy_intp indx = *(npy_intp *)indxp;
+        if (indx < 0) {
+            indx += shape;
+        }
+        indexed = (@type@ *)(ip1 + is1 * indx);
         @type@ in2 = *(@type@ *)value;
         if (NPY_UNLIKELY(in2 == 0)) {
             npy_set_floatstatus_divbyzero();

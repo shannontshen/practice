@@ -27,6 +27,7 @@
 #include "number.h"
 #include "dispatching.h"
 #include "string_ufuncs.h"
+#include "extobj.h"  /* for _extobject_contextvar exposure */
 
 /* Automatically generated code to define all ufuncs: */
 #include "funcs.inc"
@@ -57,19 +58,6 @@ object_ufunc_type_resolver(PyUFuncObject *ufunc,
     return 0;
 }
 
-static int
-object_ufunc_loop_selector(PyUFuncObject *ufunc,
-                            PyArray_Descr **NPY_UNUSED(dtypes),
-                            PyUFuncGenericFunction *out_innerloop,
-                            void **out_innerloopdata,
-                            int *out_needs_api)
-{
-    *out_innerloop = ufunc->functions[0];
-    *out_innerloopdata = (ufunc->data == NULL) ? NULL : ufunc->data[0];
-    *out_needs_api = 1;
-
-    return 0;
-}
 
 PyObject *
 ufunc_frompyfunc(PyObject *NPY_UNUSED(dummy), PyObject *args, PyObject *kwds) {
@@ -165,7 +153,6 @@ ufunc_frompyfunc(PyObject *NPY_UNUSED(dummy), PyObject *args, PyObject *kwds) {
     self->ptr = ptr;
 
     self->type_resolver = &object_ufunc_type_resolver;
-    self->legacy_inner_loop_selector = &object_ufunc_loop_selector;
     PyObject_GC_Track(self);
 
     return (PyObject *)self;
@@ -274,19 +261,6 @@ int initumath(PyObject *m)
 #define ADDCONST(str) PyModule_AddIntConstant(m, #str, UFUNC_##str)
 #define ADDSCONST(str) PyModule_AddStringConstant(m, "UFUNC_" #str, UFUNC_##str)
 
-    ADDCONST(ERR_IGNORE);
-    ADDCONST(ERR_WARN);
-    ADDCONST(ERR_CALL);
-    ADDCONST(ERR_RAISE);
-    ADDCONST(ERR_PRINT);
-    ADDCONST(ERR_LOG);
-    ADDCONST(ERR_DEFAULT);
-
-    ADDCONST(SHIFT_DIVIDEBYZERO);
-    ADDCONST(SHIFT_OVERFLOW);
-    ADDCONST(SHIFT_UNDERFLOW);
-    ADDCONST(SHIFT_INVALID);
-
     ADDCONST(FPE_DIVIDEBYZERO);
     ADDCONST(FPE_OVERFLOW);
     ADDCONST(FPE_UNDERFLOW);
@@ -299,6 +273,9 @@ int initumath(PyObject *m)
 #undef ADDCONST
 #undef ADDSCONST
     PyModule_AddIntConstant(m, "UFUNC_BUFSIZE_DEFAULT", (long)NPY_BUFSIZE);
+
+    Py_INCREF(npy_extobj_contextvar);
+    PyModule_AddObject(m, "_extobj_contextvar", npy_extobj_contextvar);
 
     PyModule_AddObject(m, "PINF", PyFloat_FromDouble(NPY_INFINITY));
     PyModule_AddObject(m, "NINF", PyFloat_FromDouble(-NPY_INFINITY));

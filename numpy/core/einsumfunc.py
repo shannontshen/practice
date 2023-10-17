@@ -13,6 +13,8 @@ from numpy.core.overrides import array_function_dispatch
 
 __all__ = ['einsum', 'einsum_path']
 
+# importing string for string.ascii_letters would be too slow
+# the first import before caching has been measured to take 800 µs (#23777)
 einsum_symbols = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
 einsum_symbols_set = set(einsum_symbols)
 
@@ -1237,12 +1239,12 @@ def einsum(*operands, out=None, optimize=False, **kwargs):
         Controls what kind of data casting may occur.  Setting this to
         'unsafe' is not recommended, as it can adversely affect accumulations.
 
-          * 'no' means the data types should not be cast at all.
-          * 'equiv' means only byte-order changes are allowed.
-          * 'safe' means only casts which can preserve values are allowed.
-          * 'same_kind' means only safe casts or casts within a kind,
-            like float64 to float32, are allowed.
-          * 'unsafe' means any data conversions may be done.
+        * 'no' means the data types should not be cast at all.
+        * 'equiv' means only byte-order changes are allowed.
+        * 'safe' means only casts which can preserve values are allowed.
+        * 'same_kind' means only safe casts or casts within a kind,
+          like float64 to float32, are allowed.
+        * 'unsafe' means any data conversions may be done.
 
         Default is 'safe'.
     optimize : {False, True, 'greedy', 'optimal'}, optional
@@ -1259,13 +1261,12 @@ def einsum(*operands, out=None, optimize=False, **kwargs):
     See Also
     --------
     einsum_path, dot, inner, outer, tensordot, linalg.multi_dot
-    einops :
-        similar verbose interface is provided by
+    einsum:
+        Similar verbose interface is provided by the
         `einops <https://github.com/arogozhnikov/einops>`_ package to cover
         additional operations: transpose, reshape/flatten, repeat/tile,
         squeeze/unsqueeze and reductions.
-    opt_einsum :
-        `opt_einsum <https://optimized-einsum.readthedocs.io/en/stable/>`_
+        The `opt_einsum <https://optimized-einsum.readthedocs.io/en/stable/>`_
         optimizes contraction order for einsum-like expressions
         in backend-agnostic manner.
 

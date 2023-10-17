@@ -9,7 +9,7 @@ from .._utils import set_module
 from ._machar import MachAr
 from . import numeric
 from . import numerictypes as ntypes
-from .numeric import array, inf, NaN
+from .numeric import array, inf, nan
 from .umath import log10, exp2, nextafter, isnan
 
 
@@ -121,8 +121,8 @@ class MachArLike:
 
 _convert_to_float = {
     ntypes.csingle: ntypes.single,
-    ntypes.complex_: ntypes.float_,
-    ntypes.clongfloat: ntypes.longfloat
+    ntypes.complex128: ntypes.float64,
+    ntypes.clongdouble: ntypes.longdouble
     }
 
 # Parameters for creating MachAr / MachAr-like objects
@@ -277,7 +277,7 @@ def _register_known_types():
     huge_dd = nextafter(ld(inf), ld(0), dtype=ld)
     # As the smallest_normal in double double is so hard to calculate we set
     # it to NaN.
-    smallest_normal_dd = NaN
+    smallest_normal_dd = nan
     # Leave the same value for the smallest subnormal as double
     smallest_subnormal_dd = ld(nextafter(0., 1.))
     float_dd_ma = MachArLike(ld,
@@ -333,7 +333,8 @@ def _get_machar(ftype):
     # Detect known / suspected types
     # ftype(-1.0) / ftype(10.0) is better than ftype('-0.1') because stold
     # may be deficient
-    key = (ftype(-1.0) / ftype(10.)).newbyteorder('<').tobytes()
+    key = (ftype(-1.0) / ftype(10.))
+    key = key.view(key.dtype.newbyteorder("<")).tobytes()
     ma_like = None
     if ftype == ntypes.longdouble:
         # Could be 80 bit == 10 byte extended precision, where last bytes can
@@ -466,7 +467,7 @@ class finfo:
     References
     ----------
     .. [1] IEEE Standard for Floating-Point Arithmetic, IEEE Std 754-2008,
-           pp.1-70, 2008, http://www.doi.org/10.1109/IEEESTD.2008.4610935
+           pp.1-70, 2008, https://doi.org/10.1109/IEEESTD.2008.4610935
     .. [2] Wikipedia, "Denormal Numbers",
            https://en.wikipedia.org/wiki/Denormal_number
 
@@ -482,9 +483,12 @@ class finfo:
     _finfo_cache = {}
 
     def __new__(cls, dtype):
-        obj = cls._finfo_cache.get(dtype)  # most common path
-        if obj is not None:
-            return obj
+        try:
+            obj = cls._finfo_cache.get(dtype)  # most common path
+            if obj is not None:
+                return obj
+        except TypeError:
+            pass
 
         if dtype is None:
             # Deprecated in NumPy 1.25, 2023-01-16
@@ -505,7 +509,7 @@ class finfo:
         if obj is not None:
             return obj
         dtypes = [dtype]
-        newdtype = numeric.obj2sctype(dtype)
+        newdtype = ntypes.obj2sctype(dtype)
         if newdtype is not dtype:
             dtypes.append(newdtype)
             dtype = newdtype

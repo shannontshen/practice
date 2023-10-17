@@ -1,34 +1,31 @@
 from collections.abc import Sequence
-from typing import TypeVar, Any, overload, Union, Literal
+from typing import TypeVar, Any, overload, Literal
 
 from numpy import (
-    ndarray,
-    dtype,
     bool_,
-    unsignedinteger,
-    signedinteger,
-    floating,
-    complexfloating,
     number,
     _OrderKACF,
 )
 from numpy._typing import (
+    NDArray,
     _ArrayLikeBool_co,
     _ArrayLikeUInt_co,
     _ArrayLikeInt_co,
     _ArrayLikeFloat_co,
     _ArrayLikeComplex_co,
+    _ArrayLikeObject_co,
     _DTypeLikeBool,
     _DTypeLikeUInt,
     _DTypeLikeInt,
     _DTypeLikeFloat,
     _DTypeLikeComplex,
     _DTypeLikeComplex_co,
+    _DTypeLikeObject,
 )
 
 _ArrayType = TypeVar(
     "_ArrayType",
-    bound=ndarray[Any, dtype[Union[bool_, number[Any]]]],
+    bound=NDArray[bool_ | number[Any]],
 )
 
 _OptimizeKind = None | bool | Literal["greedy", "optimal"] | Sequence[Any]
@@ -132,6 +129,51 @@ def einsum(
     optimize: _OptimizeKind = ...,
 ) -> _ArrayType: ...
 
+@overload
+def einsum(
+    subscripts: str | _ArrayLikeInt_co,
+    /,
+    *operands: _ArrayLikeObject_co,
+    out: None = ...,
+    dtype: None | _DTypeLikeObject = ...,
+    order: _OrderKACF = ...,
+    casting: _CastingSafe = ...,
+    optimize: _OptimizeKind = ...,
+) -> Any: ...
+@overload
+def einsum(
+    subscripts: str | _ArrayLikeInt_co,
+    /,
+    *operands: Any,
+    casting: _CastingUnsafe,
+    dtype: None | _DTypeLikeObject = ...,
+    out: None = ...,
+    order: _OrderKACF = ...,
+    optimize: _OptimizeKind = ...,
+) -> Any: ...
+@overload
+def einsum(
+    subscripts: str | _ArrayLikeInt_co,
+    /,
+    *operands: _ArrayLikeObject_co,
+    out: _ArrayType,
+    dtype: None | _DTypeLikeObject = ...,
+    order: _OrderKACF = ...,
+    casting: _CastingSafe = ...,
+    optimize: _OptimizeKind = ...,
+) -> _ArrayType: ...
+@overload
+def einsum(
+    subscripts: str | _ArrayLikeInt_co,
+    /,
+    *operands: Any,
+    out: _ArrayType,
+    casting: _CastingUnsafe,
+    dtype: None | _DTypeLikeObject = ...,
+    order: _OrderKACF = ...,
+    optimize: _OptimizeKind = ...,
+) -> _ArrayType: ...
+
 # NOTE: `einsum_call` is a hidden kwarg unavailable for public use.
 # It is therefore excluded from the signatures below.
 # NOTE: In practice the list consists of a `str` (first element)
@@ -139,6 +181,6 @@ def einsum(
 def einsum_path(
     subscripts: str | _ArrayLikeInt_co,
     /,
-    *operands: _ArrayLikeComplex_co,
+    *operands: _ArrayLikeComplex_co | _DTypeLikeObject,
     optimize: _OptimizeKind = ...,
 ) -> tuple[list[Any], str]: ...

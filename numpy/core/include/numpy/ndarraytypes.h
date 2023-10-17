@@ -44,23 +44,6 @@
 #define NPY_FAIL 0
 #define NPY_SUCCEED 1
 
-/*
- * Binary compatibility version number.  This number is increased
- * whenever the C-API is changed such that binary compatibility is
- * broken, i.e. whenever a recompile of extension modules is needed.
- */
-#define NPY_VERSION NPY_ABI_VERSION
-
-/*
- * Minor API version.  This number is increased whenever a change is
- * made to the C-API -- whether it breaks binary compatibility or not.
- * Some changes, such as adding a function pointer to the end of the
- * function table, can be made without breaking binary compatibility.
- * In this case, only the NPY_FEATURE_VERSION (*not* NPY_VERSION)
- * would be increased.  Whenever binary compatibility is broken, both
- * NPY_VERSION and NPY_FEATURE_VERSION should be increased.
- */
-#define NPY_FEATURE_VERSION NPY_API_VERSION
 
 enum NPY_TYPES {    NPY_BOOL=0,
                     NPY_BYTE, NPY_UBYTE,
@@ -129,7 +112,7 @@ enum NPY_TYPECHAR {
         NPY_CLONGDOUBLELTR = 'G',
         NPY_OBJECTLTR = 'O',
         NPY_STRINGLTR = 'S',
-        NPY_STRINGLTR2 = 'a',
+        NPY_DEPRECATED_STRINGLTR2 = 'a',
         NPY_UNICODELTR = 'U',
         NPY_VOIDLTR = 'V',
         NPY_DATETIMELTR = 'M',
@@ -417,25 +400,10 @@ typedef int (PyArray_FillFunc)(void *, npy_intp, void *);
 
 typedef int (PyArray_SortFunc)(void *, npy_intp, void *);
 typedef int (PyArray_ArgSortFunc)(void *, npy_intp *, npy_intp, void *);
-typedef int (PyArray_PartitionFunc)(void *, npy_intp, npy_intp,
-                                    npy_intp *, npy_intp *,
-                                    void *);
-typedef int (PyArray_ArgPartitionFunc)(void *, npy_intp *, npy_intp, npy_intp,
-                                       npy_intp *, npy_intp *,
-                                       void *);
 
 typedef int (PyArray_FillWithScalarFunc)(void *, npy_intp, void *, void *);
 
 typedef int (PyArray_ScalarKindFunc)(void *);
-
-typedef void (PyArray_FastClipFunc)(void *in, npy_intp n_in, void *min,
-                                    void *max, void *out);
-typedef void (PyArray_FastPutmaskFunc)(void *in, void *mask, npy_intp n_in,
-                                       void *values, npy_intp nv);
-typedef int  (PyArray_FastTakeFunc)(void *dest, void *src, npy_intp *indarray,
-                                       npy_intp nindarray, npy_intp n_outer,
-                                       npy_intp m_middle, npy_intp nelem,
-                                       NPY_CLIPMODE clipmode);
 
 typedef struct {
         npy_intp *ptr;
@@ -542,9 +510,9 @@ typedef struct {
         int **cancastscalarkindto;
         int *cancastto;
 
-        PyArray_FastClipFunc *fastclip;
-        PyArray_FastPutmaskFunc *fastputmask;
-        PyArray_FastTakeFunc *fasttake;
+        void *_unused1;
+        void *_unused2;
+        void *_unused3;
 
         /*
          * Function to select smallest
@@ -729,11 +697,15 @@ typedef struct tagPyArrayObject_fields {
     int flags;
     /* For weak references */
     PyObject *weakreflist;
+#if NPY_FEATURE_VERSION >= NPY_1_20_API_VERSION
     void *_buffer_info;  /* private buffer info, tagged to allow warning */
+#endif
     /*
      * For malloc/calloc/realloc/free per object
      */
+#if NPY_FEATURE_VERSION >= NPY_1_22_API_VERSION
     PyObject *mem_handler;
+#endif
 } PyArrayObject_fields;
 
 /*
@@ -972,19 +944,6 @@ typedef int (PyArray_FinalizeFunc)(PyArrayObject *, PyObject *);
 #define NPY_BUFSIZE 8192
 /* buffer stress test size: */
 /*#define NPY_BUFSIZE 17*/
-
-#define PyArray_MAX(a,b) (((a)>(b))?(a):(b))
-#define PyArray_MIN(a,b) (((a)<(b))?(a):(b))
-#define PyArray_CLT(p,q) ((((p).real==(q).real) ? ((p).imag < (q).imag) : \
-                               ((p).real < (q).real)))
-#define PyArray_CGT(p,q) ((((p).real==(q).real) ? ((p).imag > (q).imag) : \
-                               ((p).real > (q).real)))
-#define PyArray_CLE(p,q) ((((p).real==(q).real) ? ((p).imag <= (q).imag) : \
-                               ((p).real <= (q).real)))
-#define PyArray_CGE(p,q) ((((p).real==(q).real) ? ((p).imag >= (q).imag) : \
-                               ((p).real >= (q).real)))
-#define PyArray_CEQ(p,q) (((p).real==(q).real) && ((p).imag == (q).imag))
-#define PyArray_CNE(p,q) (((p).real!=(q).real) || ((p).imag != (q).imag))
 
 /*
  * C API: consists of Macros and functions.  The MACROS are defined
@@ -1671,11 +1630,13 @@ PyArray_CLEARFLAGS(PyArrayObject *arr, int flags)
     ((PyArrayObject_fields *)arr)->flags &= ~flags;
 }
 
-static inline NPY_RETURNS_BORROWED_REF PyObject *
-PyArray_HANDLER(PyArrayObject *arr)
-{
-    return ((PyArrayObject_fields *)arr)->mem_handler;
-}
+#if NPY_FEATURE_VERSION >= NPY_1_22_API_VERSION
+    static inline NPY_RETURNS_BORROWED_REF PyObject *
+    PyArray_HANDLER(PyArrayObject *arr)
+    {
+        return ((PyArrayObject_fields *)arr)->mem_handler;
+    }
+#endif
 
 #define PyTypeNum_ISBOOL(type) ((type) == NPY_BOOL)
 
@@ -1860,13 +1821,6 @@ typedef struct {
                            * does not have ARR_HAS_DESCR flag set)
                            */
 } PyArrayInterface;
-
-/*
- * This is a function for hooking into the PyDataMem_NEW/FREE/RENEW functions.
- * See the documentation for PyDataMem_SetEventHook.
- */
-typedef void (PyDataMem_EventHookFunc)(void *inp, void *outp, size_t size,
-                                       void *user_data);
 
 
 /*

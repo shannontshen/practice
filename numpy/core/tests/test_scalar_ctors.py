@@ -82,17 +82,25 @@ class TestFromInt:
             assert_equal(np.uint64(-2), np.uint64(18446744073709551614))
 
 
-int_types = [np.byte, np.short, np.intc, np.int_, np.longlong]
-uint_types = [np.ubyte, np.ushort, np.uintc, np.uint, np.ulonglong]
+int_types = [np.byte, np.short, np.intc, np.long, np.longlong]
+uint_types = [np.ubyte, np.ushort, np.uintc, np.ulong, np.ulonglong]
 float_types = [np.half, np.single, np.double, np.longdouble]
 cfloat_types = [np.csingle, np.cdouble, np.clongdouble]
 
 
 class TestArrayFromScalar:
-    """ gh-15467 """
+    """ gh-15467 and gh-19125 """
 
-    def _do_test(self, t1, t2):
-        x = t1(2)
+    def _do_test(self, t1, t2, arg=2):
+        if arg is None:
+            x = t1()
+        elif isinstance(arg, tuple):
+            if t1 is np.clongdouble:
+                pytest.xfail("creating a clongdouble from real and "
+                             "imaginary parts isn't supported")
+            x = t1(*arg)
+        else:
+            x = t1(arg)
         arr = np.array(x, dtype=t2)
         # type should be preserved exactly
         if t2 is None:
@@ -112,8 +120,18 @@ class TestArrayFromScalar:
 
     @pytest.mark.parametrize('t1', cfloat_types)
     @pytest.mark.parametrize('t2', cfloat_types + [None])
-    def test_complex(self, t1, t2):
-        return self._do_test(t1, t2)
+    @pytest.mark.parametrize('arg', [2, 1 + 3j, (1, 2), None])
+    def test_complex(self, t1, t2, arg):
+        self._do_test(t1, t2, arg)
+
+    @pytest.mark.parametrize('t', cfloat_types)
+    def test_complex_errors(self, t):
+        with pytest.raises(TypeError):
+            t(1j, 1j)
+        with pytest.raises(TypeError):
+            t(1, None)
+        with pytest.raises(TypeError):
+            t(None, 1)
 
 
 @pytest.mark.parametrize("length",

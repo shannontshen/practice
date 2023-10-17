@@ -17,6 +17,7 @@
 #include "numpyos.h"
 #include "arrayobject.h"
 #include "scalartypes.h"
+#include "dtypemeta.h"
 
 /*************************************************************************
  ****************   Implement Buffer Protocol ****************************
@@ -417,9 +418,16 @@ _buffer_format_string(PyArray_Descr *descr, _tmp_string_t *str,
             break;
         }
         default:
-            PyErr_Format(PyExc_ValueError,
-                         "cannot include dtype '%c' in a buffer",
-                         descr->type);
+            if (NPY_DT_is_legacy(NPY_DTYPE(descr))) {
+                PyErr_Format(PyExc_ValueError,
+                             "cannot include dtype '%c' in a buffer",
+                             descr->type);
+            }
+            else {
+                PyErr_Format(PyExc_ValueError,
+                             "cannot include dtype '%s' in a buffer",
+                             ((PyTypeObject*)NPY_DTYPE(descr))->tp_name);
+            }
             return -1;
         }
     }
@@ -895,7 +903,7 @@ static int
 _descriptor_from_pep3118_format_fast(char const *s, PyObject **result);
 
 static int
-_pep3118_letter_to_type(char letter, int native, int complex);
+_pep3118_letter_to_type(char letter, int native, int is_complex);
 
 NPY_NO_EXPORT PyArray_Descr*
 _descriptor_from_pep3118_format(char const *s)
@@ -1058,7 +1066,7 @@ _descriptor_from_pep3118_format_fast(char const *s, PyObject **result)
 }
 
 static int
-_pep3118_letter_to_type(char letter, int native, int complex)
+_pep3118_letter_to_type(char letter, int native, int is_complex)
 {
     switch (letter)
     {
@@ -1074,9 +1082,9 @@ _pep3118_letter_to_type(char letter, int native, int complex)
     case 'q': return native ? NPY_LONGLONG : NPY_INT64;
     case 'Q': return native ? NPY_ULONGLONG : NPY_UINT64;
     case 'e': return NPY_HALF;
-    case 'f': return complex ? NPY_CFLOAT : NPY_FLOAT;
-    case 'd': return complex ? NPY_CDOUBLE : NPY_DOUBLE;
-    case 'g': return native ? (complex ? NPY_CLONGDOUBLE : NPY_LONGDOUBLE) : -1;
+    case 'f': return is_complex ? NPY_CFLOAT : NPY_FLOAT;
+    case 'd': return is_complex ? NPY_CDOUBLE : NPY_DOUBLE;
+    case 'g': return native ? (is_complex ? NPY_CLONGDOUBLE : NPY_LONGDOUBLE) : -1;
     default:
         /* Other unhandled cases */
         return -1;

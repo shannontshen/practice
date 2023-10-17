@@ -23,7 +23,7 @@ __all__ = [
     'compress', 'cumprod', 'cumproduct', 'cumsum', 'diagonal', 'mean',
     'max', 'min',
     'ndim', 'nonzero', 'partition', 'prod', 'product', 'ptp', 'put',
-    'ravel', 'repeat', 'reshape', 'resize', 'round', 'round_',
+    'ravel', 'repeat', 'reshape', 'resize', 'round',
     'searchsorted', 'shape', 'size', 'sometrue', 'sort', 'squeeze',
     'std', 'sum', 'swapaxes', 'take', 'trace', 'transpose', 'var',
 ]
@@ -240,7 +240,7 @@ def reshape(a, newshape, order='C'):
     -----
     It is not always possible to change the shape of an array without copying
     the data.
-    
+
     The `order` keyword gives the index ordering both for *fetching* the values
     from `a`, and then *placing* the values into the output array.
     For example, let's say you have an array:
@@ -345,9 +345,9 @@ def choose(a, choices, out=None, mode='raise'):
     mode : {'raise' (default), 'wrap', 'clip'}, optional
         Specifies how indices outside ``[0, n-1]`` will be treated:
 
-          * 'raise' : an exception is raised
-          * 'wrap' : value becomes value mod ``n``
-          * 'clip' : values < 0 are mapped to 0, values > n-1 are mapped to n-1
+        * 'raise' : an exception is raised
+        * 'wrap' : value becomes value mod ``n``
+        * 'clip' : values < 0 are mapped to 0, values > n-1 are mapped to n-1
 
     Returns
     -------
@@ -593,7 +593,7 @@ def transpose(a, axes=None):
     For a 1-D array, this returns an unchanged view of the original array, as a
     transposed vector is simply the same vector.
     To convert a 1-D array into a 2-D column vector, an additional dimension
-    must be added, e.g., ``np.atleast2d(a).T`` achieves this, as does
+    must be added, e.g., ``np.atleast_2d(a).T`` achieves this, as does
     ``a[:, np.newaxis]``.
     For a 2-D array, this is the standard matrix transpose.
     For an n-D array, if axes are given, their order indicates how the
@@ -740,7 +740,7 @@ def partition(a, kth, axis=-1, kind='introselect', order=None):
     >>> a = np.array([7, 1, 7, 7, 1, 5, 7, 2, 3, 2, 6, 2, 3, 0])
     >>> p = np.partition(a, 4)
     >>> p
-    array([0, 1, 2, 1, 2, 5, 2, 3, 3, 6, 7, 7, 7, 7])
+    array([0, 1, 2, 1, 2, 5, 2, 3, 3, 6, 7, 7, 7, 7]) # may vary
 
     ``p[4]`` is 2;  all elements in ``p[:4]`` are less than or equal
     to ``p[4]``, and all elements in ``p[5:]`` are greater than or
@@ -838,13 +838,13 @@ def argpartition(a, kth, axis=-1, kind='introselect', order=None):
 
     >>> x = np.array([3, 4, 2, 1])
     >>> x[np.argpartition(x, 3)]
-    array([2, 1, 3, 4])
+    array([2, 1, 3, 4]) # may vary
     >>> x[np.argpartition(x, (1, 3))]
-    array([1, 2, 3, 4])
+    array([1, 2, 3, 4]) # may vary
 
     >>> x = [3, 4, 2, 1]
     >>> np.array(x)[np.argpartition(x, 3)]
-    array([2, 1, 3, 4])
+    array([2, 1, 3, 4]) # may vary
 
     Multi-dimensional array:
 
@@ -1389,11 +1389,11 @@ def searchsorted(a, v, side='left', sorter=None):
 
     Examples
     --------
-    >>> np.searchsorted([1,2,3,4,5], 3)
+    >>> np.searchsorted([11,12,13,14,15], 13)
     2
-    >>> np.searchsorted([1,2,3,4,5], 3, side='right')
+    >>> np.searchsorted([11,12,13,14,15], 13, side='right')
     3
-    >>> np.searchsorted([1,2,3,4,5], [-10, 10, 2, 3])
+    >>> np.searchsorted([11,12,13,14,15], [-10, 20, 12, 13])
     array([0, 5, 1, 2])
 
     """
@@ -1801,9 +1801,10 @@ def ravel(a, order='C'):
     Returns
     -------
     y : array_like
-        y is an array of the same subtype as `a`, with shape ``(a.size,)``.
-        Note that matrices are special cased for backward compatibility, if `a`
-        is a matrix, then y is a 1-D ndarray.
+        y is a contiguous 1-D array of the same subtype as `a`,
+        with shape ``(a.size,)``.
+        Note that matrices are special cased for backward compatibility,
+        if `a` is a matrix, then y is a 1-D ndarray.
 
     See Also
     --------
@@ -1822,7 +1823,8 @@ def ravel(a, order='C'):
     column-major, Fortran-style index ordering.
 
     When a view is desired in as many cases as possible, ``arr.reshape(-1)``
-    may be preferable.
+    may be preferable. However, ``ravel`` supports ``K`` in the optional
+    ``order`` argument while ``reshape`` does not.
 
     Examples
     --------
@@ -2234,12 +2236,8 @@ def sum(a, axis=None, dtype=None, out=None, keepdims=np._NoValue,
     See Also
     --------
     ndarray.sum : Equivalent method.
-
-    add.reduce : Equivalent functionality of `add`.
-
+    add: ``numpy.add.reduce`` equivalent function.
     cumsum : Cumulative sum of array elements.
-
-    trapz : Integration of array values using the composite trapezoidal rule.
 
     mean, average
 
@@ -2542,7 +2540,6 @@ def cumsum(a, axis=None, dtype=None, out=None):
     See Also
     --------
     sum : Sum array elements.
-    trapz : Integration of array values using the composite trapezoidal rule.
     diff : Calculate the n-th discrete difference along given axis.
 
     Notes
@@ -2598,7 +2595,7 @@ def ptp(a, axis=None, out=None, keepdims=np._NoValue):
     .. warning::
         `ptp` preserves the data type of the array. This means the
         return value for an input of signed integers with n bits
-        (e.g. `np.int8`, `np.int16`, etc) is also a signed integer
+        (e.g. `numpy.int8`, `numpy.int16`, etc) is also a signed integer
         with n bits.  In that case, peak-to-peak values greater than
         ``2**(n-1)-1`` will be returned as negative values. An example
         with a work-around is shown below.
@@ -2672,13 +2669,6 @@ def ptp(a, axis=None, out=None, keepdims=np._NoValue):
     kwargs = {}
     if keepdims is not np._NoValue:
         kwargs['keepdims'] = keepdims
-    if type(a) is not mu.ndarray:
-        try:
-            ptp = a.ptp
-        except AttributeError:
-            pass
-        else:
-            return ptp(axis=axis, out=out, **kwargs)
     return _methods._ptp(a, axis=axis, out=out, **kwargs)
 
 
@@ -2739,7 +2729,7 @@ def max(a, axis=None, out=None, keepdims=np._NoValue, initial=np._NoValue,
     max : ndarray or scalar
         Maximum of `a`. If `axis` is None, the result is a scalar value.
         If `axis` is an int, the result is an array of dimension
-        ``a.ndim - 1``. If `axis` is a tuple, the result is an array of 
+        ``a.ndim - 1``. If `axis` is a tuple, the result is an array of
         dimension ``a.ndim - len(axis)``.
 
     See Also
@@ -2782,9 +2772,9 @@ def max(a, axis=None, out=None, keepdims=np._NoValue, initial=np._NoValue,
     >>> np.max(a, where=[False, True], initial=-1, axis=0)
     array([-1,  3])
     >>> b = np.arange(5, dtype=float)
-    >>> b[2] = np.NaN
+    >>> b[2] = np.nan
     >>> np.max(b)
-    nan
+    np.float64(nan)
     >>> np.max(b, where=~np.isnan(b), initial=-1)
     4.0
     >>> np.nanmax(b)
@@ -2882,7 +2872,7 @@ def min(a, axis=None, out=None, keepdims=np._NoValue, initial=np._NoValue,
     min : ndarray or scalar
         Minimum of `a`. If `axis` is None, the result is a scalar value.
         If `axis` is an int, the result is an array of dimension
-        ``a.ndim - 1``.  If `axis` is a tuple, the result is an array of 
+        ``a.ndim - 1``.  If `axis` is a tuple, the result is an array of
         dimension ``a.ndim - len(axis)``.
 
     See Also
@@ -2926,9 +2916,9 @@ def min(a, axis=None, out=None, keepdims=np._NoValue, initial=np._NoValue,
     array([10,  1])
 
     >>> b = np.arange(5, dtype=float)
-    >>> b[2] = np.NaN
+    >>> b[2] = np.nan
     >>> np.min(b)
-    nan
+    np.float64(nan)
     >>> np.min(b, where=~np.isnan(b), initial=10)
     0.0
     >>> np.nanmin(b)
@@ -3070,7 +3060,7 @@ def prod(a, axis=None, dtype=None, out=None, keepdims=np._NoValue,
     array([  2.,  12.])
     >>> np.prod(a, axis=0)
     array([3., 8.])
-    
+
     Or select specific elements to include:
 
     >>> np.prod([1., np.nan, 3.], where=[True, False, True])
@@ -3504,13 +3494,13 @@ def mean(a, axis=None, dtype=None, out=None, keepdims=np._NoValue, *,
 
 
 def _std_dispatcher(a, axis=None, dtype=None, out=None, ddof=None,
-                    keepdims=None, *, where=None):
-    return (a, where, out)
+                    keepdims=None, *, where=None, mean=None):
+    return (a, where, out, mean)
 
 
 @array_function_dispatch(_std_dispatcher)
 def std(a, axis=None, dtype=None, out=None, ddof=0, keepdims=np._NoValue, *,
-        where=np._NoValue):
+        where=np._NoValue, mean=np._NoValue):
     """
     Compute the standard deviation along the specified axis.
 
@@ -3552,12 +3542,19 @@ def std(a, axis=None, dtype=None, out=None, ddof=0, keepdims=np._NoValue, *,
         `ndarray`, however any non-default value will be.  If the
         sub-class' method does not implement `keepdims` any
         exceptions will be raised.
-
     where : array_like of bool, optional
         Elements to include in the standard deviation.
         See `~numpy.ufunc.reduce` for details.
 
         .. versionadded:: 1.20.0
+
+    mean : array like, optional
+        Provide the mean to prevent its recalculation. The mean should have
+        a shape as if it was calculated with ``keepdims=True``.
+        The axis for the calculation of the mean should be the same as used in
+        the call to this std function.
+
+        .. versionadded:: 1.26.0
 
     Returns
     -------
@@ -3626,12 +3623,30 @@ def std(a, axis=None, dtype=None, out=None, ddof=0, keepdims=np._NoValue, *,
     >>> np.std(a, where=[[True], [True], [False]])
     2.0
 
+    Using the mean keyword to save computation time:
+
+    >>> import numpy as np
+    >>> from timeit import timeit
+    >>> a = np.array([[14, 8, 11, 10], [7, 9, 10, 11], [10, 15, 5, 10]])
+    >>> mean = np.mean(a, axis=1, keepdims=True)
+    >>>
+    >>> g = globals()
+    >>> n = 10000
+    >>> t1 = timeit("std = np.std(a, axis=1, mean=mean)", globals=g, number=n)
+    >>> t2 = timeit("std = np.std(a, axis=1)", globals=g, number=n)
+    >>> print(f'Percentage execution time saved {100*(t2-t1)/t2:.0f}%')
+    #doctest: +SKIP
+    Percentage execution time saved 30%
+
     """
     kwargs = {}
     if keepdims is not np._NoValue:
         kwargs['keepdims'] = keepdims
     if where is not np._NoValue:
         kwargs['where'] = where
+    if mean is not np._NoValue:
+        kwargs['mean'] = mean
+
     if type(a) is not mu.ndarray:
         try:
             std = a.std
@@ -3645,13 +3660,13 @@ def std(a, axis=None, dtype=None, out=None, ddof=0, keepdims=np._NoValue, *,
 
 
 def _var_dispatcher(a, axis=None, dtype=None, out=None, ddof=None,
-                    keepdims=None, *, where=None):
-    return (a, where, out)
+                    keepdims=None, *, where=None, mean=None):
+    return (a, where, out, mean)
 
 
 @array_function_dispatch(_var_dispatcher)
 def var(a, axis=None, dtype=None, out=None, ddof=0, keepdims=np._NoValue, *,
-        where=np._NoValue):
+        where=np._NoValue, mean=np._NoValue):
     """
     Compute the variance along the specified axis.
 
@@ -3694,12 +3709,19 @@ def var(a, axis=None, dtype=None, out=None, ddof=0, keepdims=np._NoValue, *,
         `ndarray`, however any non-default value will be.  If the
         sub-class' method does not implement `keepdims` any
         exceptions will be raised.
-
     where : array_like of bool, optional
         Elements to include in the variance. See `~numpy.ufunc.reduce` for
         details.
 
         .. versionadded:: 1.20.0
+
+    mean : array like, optional
+        Provide the mean to prevent its recalculation. The mean should have
+        a shape as if it was calculated with ``keepdims=True``.
+        The axis for the calculation of the mean should be the same as used in
+        the call to this var function.
+
+        .. versionadded:: 1.26.0
 
     Returns
     -------
@@ -3766,12 +3788,30 @@ def var(a, axis=None, dtype=None, out=None, ddof=0, keepdims=np._NoValue, *,
     >>> np.var(a, where=[[True], [True], [False]])
     4.0
 
+    Using the mean keyword to save computation time:
+
+    >>> import numpy as np
+    >>> from timeit import timeit
+    >>>
+    >>> a = np.array([[14, 8, 11, 10], [7, 9, 10, 11], [10, 15, 5, 10]])
+    >>> mean = np.mean(a, axis=1, keepdims=True)
+    >>>
+    >>> g = globals()
+    >>> n = 10000
+    >>> t1 = timeit("var = np.var(a, axis=1, mean=mean)", globals=g, number=n)
+    >>> t2 = timeit("var = np.var(a, axis=1)", globals=g, number=n)
+    >>> print(f'Percentage execution time saved {100*(t2-t1)/t2:.0f}%')
+    #doctest: +SKIP
+    Percentage execution time saved 32%
+
     """
     kwargs = {}
     if keepdims is not np._NoValue:
         kwargs['keepdims'] = keepdims
     if where is not np._NoValue:
         kwargs['where'] = where
+    if mean is not np._NoValue:
+        kwargs['mean'] = mean
 
     if type(a) is not mu.ndarray:
         try:
@@ -3786,36 +3826,9 @@ def var(a, axis=None, dtype=None, out=None, ddof=0, keepdims=np._NoValue, *,
                          **kwargs)
 
 
-# Aliases of other functions. Provided unique docstrings 
+# Aliases of other functions. Provided unique docstrings
 # are for reference purposes only. Wherever possible,
 # avoid using them.
-
-
-def _round__dispatcher(a, decimals=None, out=None):
-    # 2023-02-28, 1.25.0
-    warnings.warn("`round_` is deprecated as of NumPy 1.25.0, and will be "
-                  "removed in NumPy 2.0. Please use `round` instead.",
-                  DeprecationWarning, stacklevel=3)
-    return (a, out)
-
-
-@array_function_dispatch(_round__dispatcher)
-def round_(a, decimals=0, out=None):
-    """
-    Round an array to the given number of decimals.
-
-    `~numpy.round_` is a disrecommended backwards-compatibility
-    alias of `~numpy.around` and `~numpy.round`.
-
-    .. deprecated:: 1.25.0
-        ``round_`` is deprecated as of NumPy 1.25.0, and will be
-        removed in NumPy 2.0. Please use `round` instead.
-
-    See Also
-    --------
-    around : equivalent function; see for details.
-    """
-    return around(a, decimals=decimals, out=out)
 
 
 def _product_dispatcher(a, axis=None, dtype=None, out=None, keepdims=None,

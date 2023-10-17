@@ -12,6 +12,7 @@ import os
 import re
 import sys
 import importlib.util
+import textwrap
 
 from os.path import join
 
@@ -96,6 +97,27 @@ def remove_whitespace(s):
 
 def _repl(str):
     return str.replace('Bool', 'npy_bool')
+
+
+class MinVersion:
+    def __init__(self, version):
+        """ Version should be the normal NumPy version, e.g. "1.25" """
+        major, minor = version.split(".")
+        self.version = f"NPY_{major}_{minor}_API_VERSION"
+
+    def __str__(self):
+        # Used by version hashing:
+        return self.version
+
+    def add_guard(self, name, normal_define):
+        """Wrap a definition behind a version guard"""
+        wrap = textwrap.dedent(f"""
+            #if NPY_FEATURE_VERSION >= {self.version}
+            {{define}}
+            #endif""")
+
+        # we only insert `define` later to avoid confusing dedent:
+        return wrap.format(define=normal_define)
 
 
 class StealRef:
@@ -391,7 +413,20 @@ class FunctionApi:
     def __init__(self, name, index, annotations, return_type, args, api_name):
         self.name = name
         self.index = index
-        self.annotations = annotations
+
+        self.min_version = None
+        self.annotations = []
+        for annotation in annotations:
+            # String checks, because manual import breaks isinstance
+            if type(annotation).__name__ == "StealRef":
+                self.annotations.append(annotation)
+            elif type(annotation).__name__ == "MinVersion":
+                if self.min_version is not None:
+                    raise ValueError("Two minimum versions specified!")
+                self.min_version = annotation
+            else:
+                raise ValueError(f"unknown annotation {annotation}")
+
         self.return_type = return_type
         self.args = args
         self.api_name = api_name
@@ -403,13 +438,14 @@ class FunctionApi:
         return argstr
 
     def define_from_array_api_string(self):
-        define = """\
-#define %s \\\n        (*(%s (*)(%s)) \\
-         %s[%d])""" % (self.name,
-                                self.return_type,
-                                self._argtypes_string(),
-                                self.api_name,
-                                self.index)
+        arguments = self._argtypes_string()
+        define = textwrap.dedent(f"""\
+            #define {self.name} \\
+                    (*({self.return_type} (*)({arguments})) \\
+                {self.api_name}[{self.index}])""")
+
+        if self.min_version is not None:
+            define = self.min_version.add_guard(self.name, define)
         return define
 
     def array_api_define(self):
@@ -440,7 +476,11 @@ def merge_api_dicts(dicts):
     return ret
 
 def check_api_dict(d):
-    """Check that an api dict is valid (does not use the same index twice)."""
+    """Check that an api dict is valid (does not use the same index twice)
+    and removed `__unused_indices__` from it (which is important only here)
+    """
+    # Pop the `__unused_indices__` field:  These are known holes:
+    removed = set(d.pop("__unused_indices__", []))
     # remove the extra value fields that aren't the index
     index_d = {k: v[0] for k, v in d.items()}
 
@@ -465,9 +505,12 @@ def check_api_dict(d):
 
     # No 'hole' in the indexes may be allowed, and it must starts at 0
     indexes = set(index_d.values())
-    expected = set(range(len(indexes)))
-    if indexes != expected:
-        diff = expected.symmetric_difference(indexes)
+    expected = set(range(len(indexes) + len(removed)))
+    if not indexes.isdisjoint(removed):
+        raise ValueError("API index used but marked unused: "
+                         f"{indexes.intersection(removed)}")
+    if indexes.union(removed) != expected:
+        diff = expected.symmetric_difference(indexes.union(removed))
         msg = "There are some holes in the API indexing: " \
               "(symmetric diff is %s)" % diff
         raise ValueError(msg)
@@ -486,6 +529,8 @@ def fullapi_hash(api_dicts):
     of the list of items in the API (as a string)."""
     a = []
     for d in api_dicts:
+        d = d.copy()
+        d.pop("__unused_indices__", None)
         for name, data in order_dict(d):
             a.extend(name)
             a.extend(','.join(map(str, data)))
@@ -500,7 +545,7 @@ def get_versions_hash():
     d = []
 
     file = os.path.join(os.path.dirname(__file__), 'cversions.txt')
-    with open(file, 'r') as fid:
+    with open(file) as fid:
         for line in fid:
             m = VERRE.match(line)
             if m:

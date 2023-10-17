@@ -242,7 +242,7 @@ PyArray_Newshape(PyArrayObject *self, PyArray_Dims *newdims,
     /*
      * sometimes we have to create a new copy of the array
      * in order to get the right orientation and
-     * because we can't just re-use the buffer with the
+     * because we can't just reuse the buffer with the
      * data in the order it is in.
      */
     Py_INCREF(self);
@@ -285,7 +285,7 @@ PyArray_Newshape(PyArrayObject *self, PyArray_Dims *newdims,
             Py_TYPE(self), PyArray_DESCR(self),
             ndim, dimensions, strides, PyArray_DATA(self),
             flags, (PyObject *)self, (PyObject *)self,
-            0, 1);
+            _NPY_ARRAY_ENSURE_DTYPE_IDENTITY);
     Py_DECREF(self);
     return (PyObject *)ret;
 }
@@ -729,6 +729,22 @@ PyArray_Transpose(PyArrayObject *ap, PyArray_Dims *permute)
     PyArray_UpdateFlags(ret, NPY_ARRAY_C_CONTIGUOUS | NPY_ARRAY_F_CONTIGUOUS |
                         NPY_ARRAY_ALIGNED);
     return (PyObject *)ret;
+}
+
+/*
+ * Return matrix transpose (swap last two dimensions).
+ */
+NPY_NO_EXPORT PyObject *
+PyArray_MatrixTranspose(PyArrayObject *ap)
+{
+    int ndim = PyArray_NDIM(ap);
+
+    if (ndim < 2) {
+        PyErr_SetString(PyExc_ValueError,
+                        "matrix transpose with ndim < 2 is undefined");
+        return NULL;
+    }
+    return PyArray_SwapAxes(ap, ndim - 2, ndim - 1);
 }
 
 /*

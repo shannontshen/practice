@@ -3,6 +3,8 @@ Array methods which are called by both the C-code for the method
 and the Python code for the NumPy-namespace function
 
 """
+import os
+import pickle
 import warnings
 from contextlib import nullcontext
 
@@ -13,13 +15,13 @@ from numpy.core import numerictypes as nt
 from numpy.core import _exceptions
 from numpy.core._ufunc_config import _no_nep50_warning
 from numpy._globals import _NoValue
-from numpy.compat import pickle, os_fspath
 
 # save those O(100) nanoseconds!
 umr_maximum = um.maximum.reduce
 umr_minimum = um.minimum.reduce
 umr_sum = um.add.reduce
 umr_prod = um.multiply.reduce
+umr_bitwise_count = um.bitwise_count
 umr_any = um.logical_or.reduce
 umr_all = um.logical_and.reduce
 
@@ -81,7 +83,7 @@ def _count_reduce_items(arr, axis, keepdims=False, where=True):
         # axis and full sum is more excessive than needed.
 
         # guarded to protect circular imports
-        from numpy.lib.stride_tricks import broadcast_to
+        from numpy.lib._stride_tricks_impl import broadcast_to
         # count True values in (potentially broadcasted) boolean mask
         items = umr_sum(broadcast_to(where, arr.shape), axis, nt.intp, None,
                         keepdims)
@@ -133,7 +135,7 @@ def _mean(a, axis=None, dtype=None, out=None, keepdims=False, *, where=True):
     return ret
 
 def _var(a, axis=None, dtype=None, out=None, ddof=0, keepdims=False, *,
-         where=True):
+         where=True, mean=None):
     arr = asanyarray(a)
 
     rcount = _count_reduce_items(arr, axis, keepdims=keepdims, where=where)
@@ -146,26 +148,29 @@ def _var(a, axis=None, dtype=None, out=None, ddof=0, keepdims=False, *,
     if dtype is None and issubclass(arr.dtype.type, (nt.integer, nt.bool_)):
         dtype = mu.dtype('f8')
 
-    # Compute the mean.
-    # Note that if dtype is not of inexact type then arraymean will
-    # not be either.
-    arrmean = umr_sum(arr, axis, dtype, keepdims=True, where=where)
-    # The shape of rcount has to match arrmean to not change the shape of out
-    # in broadcasting. Otherwise, it cannot be stored back to arrmean.
-    if rcount.ndim == 0:
-        # fast-path for default case when where is True
-        div = rcount
+    if mean is not None:
+        arrmean = mean
     else:
-        # matching rcount to arrmean when where is specified as array
-        div = rcount.reshape(arrmean.shape)
-    if isinstance(arrmean, mu.ndarray):
-        with _no_nep50_warning():
-            arrmean = um.true_divide(arrmean, div, out=arrmean,
-                                     casting='unsafe', subok=False)
-    elif hasattr(arrmean, "dtype"):
-        arrmean = arrmean.dtype.type(arrmean / rcount)
-    else:
-        arrmean = arrmean / rcount
+        # Compute the mean.
+        # Note that if dtype is not of inexact type then arraymean will
+        # not be either.
+        arrmean = umr_sum(arr, axis, dtype, keepdims=True, where=where)
+        # The shape of rcount has to match arrmean to not change the shape of
+        # out in broadcasting. Otherwise, it cannot be stored back to arrmean.
+        if rcount.ndim == 0:
+            # fast-path for default case when where is True
+            div = rcount
+        else:
+            # matching rcount to arrmean when where is specified as array
+            div = rcount.reshape(arrmean.shape)
+        if isinstance(arrmean, mu.ndarray):
+            with _no_nep50_warning():
+                arrmean = um.true_divide(arrmean, div, out=arrmean,
+                                         casting='unsafe', subok=False)
+        elif hasattr(arrmean, "dtype"):
+            arrmean = arrmean.dtype.type(arrmean / rcount)
+        else:
+            arrmean = arrmean / rcount
 
     # Compute sum of squared deviations from mean
     # Note that x may not be inexact and that we need it to be an array,
@@ -202,9 +207,9 @@ def _var(a, axis=None, dtype=None, out=None, ddof=0, keepdims=False, *,
     return ret
 
 def _std(a, axis=None, dtype=None, out=None, ddof=0, keepdims=False, *,
-         where=True):
+         where=True, mean=None):
     ret = _var(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
-               keepdims=keepdims, where=where)
+               keepdims=keepdims, where=where, mean=mean)
 
     if isinstance(ret, mu.ndarray):
         ret = um.sqrt(ret, out=ret)
@@ -226,9 +231,14 @@ def _dump(self, file, protocol=2):
     if hasattr(file, 'write'):
         ctx = nullcontext(file)
     else:
-        ctx = open(os_fspath(file), "wb")
+        ctx = open(os.fspath(file), "wb")
     with ctx as f:
         pickle.dump(self, f, protocol=protocol)
 
 def _dumps(self, protocol=2):
     return pickle.dumps(self, protocol=protocol)
+
+def _bitwise_count(a, out=None, *, where=True, casting='same_kind',
+          order='K', dtype=None, subok=True):
+    return umr_bitwise_count(a, out, where=where, casting=casting,
+            order=order, dtype=dtype, subok=subok)
