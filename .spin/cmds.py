@@ -175,6 +175,13 @@ def docs(ctx, sphinx_target, clean, first_build, jobs):
     help="Run tests with the given markers"
 )
 @click.option(
+    "-c",
+    "--coverage",
+    is_flag=True,
+    help="Generate a coverage report of executed tests. "
+    "An HTML copy of the report is written to `build/coverage`.",
+)
+@click.option(
     "-j",
     "n_jobs",
     metavar='N_JOBS',
@@ -200,7 +207,7 @@ Which tests to run. Can be a module, function, class, or method:
     '--verbose', '-v', is_flag=True, default=False
 )
 @click.pass_context
-def test(ctx, pytest_args, markexpr, n_jobs, tests, verbose):
+def test(ctx, pytest_args, markexpr, coverage, n_jobs, tests, verbose):
     """🔧 Run tests
 
     PYTEST_ARGS are passed through directly to pytest, e.g.:
@@ -235,6 +242,21 @@ def test(ctx, pytest_args, markexpr, n_jobs, tests, verbose):
         if markexpr != "full":
             pytest_args = ('-m', markexpr) + pytest_args
 
+    if coverage:
+        coverage_dir = pathlib.Path(pathlib.Path.cwd(), "build/coverage/")
+        if coverage_dir.is_dir():
+            click.secho(
+                f"Removing `{coverage_dir}`",
+                bold=True, fg="bright_green"
+            )
+            shutil.rmtree(coverage_dir)
+        coverage_dir.mkdir(parents=True)
+        pytest_args = (
+            "--cov-report=term",
+            f"--cov-report=html:{coverage_dir}",
+            f"--cov=numpy",
+        ) + pytest_args
+
     if (n_jobs != "1") and ('-n' not in pytest_args):
         pytest_args = ('-n', str(n_jobs)) + pytest_args
 
@@ -246,7 +268,7 @@ def test(ctx, pytest_args, markexpr, n_jobs, tests, verbose):
 
     ctx.params['pytest_args'] = pytest_args
 
-    for extra_param in ('markexpr', 'n_jobs', 'tests', 'verbose'):
+    for extra_param in ('markexpr', 'n_jobs', 'tests', 'verbose', 'coverage'):
         del ctx.params[extra_param]
     ctx.forward(meson.test)
 
