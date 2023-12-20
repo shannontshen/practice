@@ -775,7 +775,7 @@ def partition(a, kth, axis=-1, kind='introselect', order=None):
     >>> a = np.array([7, 1, 7, 7, 1, 5, 7, 2, 3, 2, 6, 2, 3, 0])
     >>> p = np.partition(a, 4)
     >>> p
-    array([0, 1, 2, 1, 2, 5, 2, 3, 3, 6, 7, 7, 7, 7]) # may vary
+    array([0, 1, 2, 1, 2, 5, 2, 3, 3, 6, 7, 7, 7, 7])
 
     ``p[4]`` is 2;  all elements in ``p[:4]`` are less than or equal
     to ``p[4]``, and all elements in ``p[5:]`` are greater than or
@@ -873,20 +873,20 @@ def argpartition(a, kth, axis=-1, kind='introselect', order=None):
 
     >>> x = np.array([3, 4, 2, 1])
     >>> x[np.argpartition(x, 3)]
-    array([2, 1, 3, 4]) # may vary
+    array([2, 1, 3, 4])
     >>> x[np.argpartition(x, (1, 3))]
-    array([1, 2, 3, 4]) # may vary
+    array([1, 2, 3, 4])
 
     >>> x = [3, 4, 2, 1]
     >>> np.array(x)[np.argpartition(x, 3)]
-    array([2, 1, 3, 4]) # may vary
+    array([2, 1, 3, 4])
 
     Multi-dimensional array:
 
     >>> x = np.array([[3, 4, 2], [1, 3, 1]])
     >>> index_array = np.argpartition(x, kth=1, axis=-1)
     >>> # below is the same as np.partition(x, kth=1)
-    >>> np.take_along_axis(x, index_array, axis=-1)  
+    >>> np.take_along_axis(x, index_array, axis=-1)
     array([[2, 3, 4],
            [1, 1, 3]])
 
@@ -1033,15 +1033,16 @@ def sort(a, axis=-1, kind=None, order=None):
     >>> dtype = [('name', 'S10'), ('height', float), ('age', int)]
     >>> values = [('Arthur', 1.8, 41), ('Lancelot', 1.9, 38),
     ...           ('Galahad', 1.7, 38)]
-    >>> a = np.array(values, dtype=dtype)       # create a structured array
-    >>> np.sort(a, order='height')                        # doctest: +SKIP
+    # create a structured array
+    >>> a = np.array(values, dtype=dtype)
+    >>> np.sort(a, order='height')  # doctest: +IGNORE_OUTPUT
     array([('Galahad', 1.7, 38), ('Arthur', 1.8, 41),
            ('Lancelot', 1.8999999999999999, 38)],
           dtype=[('name', '|S10'), ('height', '<f8'), ('age', '<i4')])
 
     Sort by age, then height if ages are equal:
 
-    >>> np.sort(a, order=['age', 'height'])               # doctest: +SKIP
+    >>> np.sort(a, order=['age', 'height'])  # doctest: +IGNORE_OUTPUT
     array([('Galahad', 1.7, 38), ('Lancelot', 1.8999999999999999, 38),
            ('Arthur', 1.8, 41)],
           dtype=[('name', '|S10'), ('height', '<f8'), ('age', '<i4')])
@@ -1254,7 +1255,7 @@ def argmax(a, axis=None, out=None, *, keepdims=np._NoValue):
     array([[4],
            [3]])
     >>> # Same as np.amax(x, axis=-1)
-    >>> np.take_along_axis(x, np.expand_dims(index_array, axis=-1), 
+    >>> np.take_along_axis(x, np.expand_dims(index_array, axis=-1),
     ...     axis=-1).squeeze(axis=-1)
     array([4, 3])
 
@@ -1351,7 +1352,7 @@ def argmin(a, axis=None, out=None, *, keepdims=np._NoValue):
     array([[2],
            [0]])
     >>> # Same as np.amax(x, axis=-1)
-    >>> np.take_along_axis(x, np.expand_dims(index_array, axis=-1), 
+    >>> np.take_along_axis(x, np.expand_dims(index_array, axis=-1),
     ...     axis=-1).squeeze(axis=-1)
     array([2, 0])
 
@@ -1424,7 +1425,7 @@ def searchsorted(a, v, side='left', sorter=None):
     As of NumPy 1.4.0 `searchsorted` works with real/complex arrays containing
     `nan` values. The enhanced sort order is documented in `sort`.
 
-    This function uses the same algorithm as the builtin python 
+    This function uses the same algorithm as the builtin python
     `bisect.bisect_left` (``side='left'``) and `bisect.bisect_right`
     (``side='right'``) functions, which is also vectorized
     in the `v` argument.
@@ -1585,8 +1586,8 @@ def squeeze(a, axis=None):
     >>> x = np.array([[1234]])
     >>> x.shape
     (1, 1)
-    >>> np.squeeze(x)
-    array(1234)  # 0d array
+    >>> np.squeeze(x)  # results a 0d array
+    array(1234)
     >>> np.squeeze(x).shape
     ()
     >>> np.squeeze(x)[()]
@@ -2358,7 +2359,7 @@ def sum(a, axis=None, dtype=None, out=None, keepdims=np._NoValue,
         return res
 
     return _wrapreduction(
-        a, np.add, 'sum', axis, dtype, out, 
+        a, np.add, 'sum', axis, dtype, out,
         keepdims=keepdims, initial=initial, where=where
     )
 
@@ -2547,7 +2548,7 @@ def all(a, axis=None, out=None, keepdims=np._NoValue, *, where=np._NoValue):
     >>> o=np.array(False)
     >>> z=np.all([-1, 4, 5], out=o)
     >>> id(z), id(o), z
-    (28293632, 28293632, array(True)) # may vary
+    (28293632, 28293632, array(True))
 
     """
     return _wrapreduction(a, np.logical_and, 'all', axis, None, out,
@@ -3088,8 +3089,8 @@ def prod(a, axis=None, dtype=None, out=None, keepdims=np._NoValue,
     raised on overflow.  That means that, on a 32-bit platform:
 
     >>> x = np.array([536870910, 536870910, 536870910, 536870910])
-    >>> np.prod(x)
-    16 # may vary
+    >>> np.prod(x)  # doctest: +SKIP
+    16
 
     The product of an empty array is the neutral element 1:
 
@@ -3520,7 +3521,7 @@ def mean(a, axis=None, dtype=None, out=None, keepdims=np._NoValue, *,
     Computing the mean in float64 is more accurate:
 
     >>> np.mean(a, dtype=np.float64)
-    0.55000000074505806 # may vary
+    0.55000000074505806
 
     Specifying a where argument:
 
@@ -3676,7 +3677,7 @@ def std(a, axis=None, dtype=None, out=None, ddof=0, keepdims=np._NoValue, *,
     --------
     >>> a = np.array([[1, 2], [3, 4]])
     >>> np.std(a)
-    1.1180339887498949 # may vary
+    1.1180339887498949
     >>> np.std(a, axis=0)
     array([1.,  1.])
     >>> np.std(a, axis=1)
@@ -3693,13 +3694,13 @@ def std(a, axis=None, dtype=None, out=None, ddof=0, keepdims=np._NoValue, *,
     Computing the standard deviation in float64 is more accurate:
 
     >>> np.std(a, dtype=np.float64)
-    0.44999999925494177 # may vary
+    0.44999999925494177
 
     Specifying a where argument:
 
     >>> a = np.array([[14, 8, 11, 10], [7, 9, 10, 11], [10, 15, 5, 10]])
     >>> np.std(a)
-    2.614064523559687 # may vary
+    2.614064523559687
     >>> np.std(a, where=[[True], [True], [False]])
     2.0
 
@@ -3881,7 +3882,7 @@ def var(a, axis=None, dtype=None, out=None, ddof=0, keepdims=np._NoValue, *,
     Computing the variance in float64 is more accurate:
 
     >>> np.var(a, dtype=np.float64)
-    0.20249999932944759 # may vary
+    0.20249999932944759
     >>> ((1-0.55)**2 + (0.1-0.55)**2)/2
     0.2025
 
@@ -3889,7 +3890,7 @@ def var(a, axis=None, dtype=None, out=None, ddof=0, keepdims=np._NoValue, *,
 
     >>> a = np.array([[14, 8, 11, 10], [7, 9, 10, 11], [10, 15, 5, 10]])
     >>> np.var(a)
-    6.833333333333333 # may vary
+    6.833333333333333
     >>> np.var(a, where=[[True], [True], [False]])
     4.0
 
