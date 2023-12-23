@@ -1235,6 +1235,16 @@ defdict = {
           docstrings.get('numpy._core.umath._rstrip_whitespace'),
           None,
           ),
+'lower':
+    Ufunc(1, 1, None,
+          docstrings.get('numpy._core.umath.lower'),
+          None,
+          ),
+'upper':
+    Ufunc(1, 1, None,
+          docstrings.get('numpy._core.umath.upper'),
+          None,
+          ),
 }
 
 def indent(st, spaces):

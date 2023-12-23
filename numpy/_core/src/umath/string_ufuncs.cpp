@@ -29,6 +29,10 @@ enum class STRIPTYPE {
     LEFTSTRIP, RIGHTSTRIP, BOTHSTRIP
 };
 
+enum class CAPITALIZATION {
+    TOLOWER, TOUPPER
+};
+
 
 template <typename character>
 static inline int
@@ -317,7 +321,7 @@ string_lrstrip_whitespace(Buffer<enc> buf, Buffer<enc> out, STRIPTYPE striptype)
 {
     npy_int64 len = buf.num_codepoints();
     if (len == 0) {
-        out.buffer_fill_with_zeros_after_index(0);
+        out.buffer_fill_with_zeros();
         return;
     }
 
@@ -352,7 +356,7 @@ string_lrstrip_chars(Buffer<enc> buf1, Buffer<enc> buf2, Buffer<enc> out, STRIPT
 {
     npy_int64 len1 = buf1.num_codepoints();
     if (len1 == 0) {
-        out.buffer_fill_with_zeros_after_index(0);
+        out.buffer_fill_with_zeros();
         return;
     }
 
@@ -414,6 +418,32 @@ string_count(Buffer<enc> buf1, Buffer<enc> buf2, npy_int64 start, npy_int64 end)
         return 0;
     }
     return count;
+}
+
+
+template <ENCODING enc>
+static inline void
+string_change_capitalization(Buffer<enc> buf, Buffer<enc> out, CAPITALIZATION cap)
+{
+    npy_int64 len = buf.num_codepoints();
+    if (len == 0) {
+        buf.buffer_fill_with_zeros();
+        return;
+    }
+
+    npy_int64 i;
+    for (i = 0; i < len; i++) {
+        switch (cap) {
+        case CAPITALIZATION::TOLOWER:
+            *out.buf = buf.tolower(i);
+            break;
+        case CAPITALIZATION::TOUPPER:
+            *out.buf = buf.toupper(i);
+            break;
+        }
+        out++;
+    }
+    out.buffer_fill_with_zeros();
 }
 
 
@@ -1016,6 +1046,60 @@ string_rstrip_chars_loop(PyArrayMethod_Context *context,
 }
 
 
+template <ENCODING enc>
+static int
+string_lower_loop(PyArrayMethod_Context *context,
+        char *const data[], npy_intp const dimensions[],
+        npy_intp const strides[], NpyAuxData *NPY_UNUSED(auxdata))
+{
+    int elsize = context->descriptors[0]->elsize;
+    int outsize = context->descriptors[1]->elsize;
+
+    char *in = data[0];
+    char *out = data[1];
+
+    npy_intp N = dimensions[0];
+
+    while (N--) {
+        Buffer<enc> buf(in, elsize);
+        Buffer<enc> outbuf(out, outsize);
+        string_change_capitalization(buf, outbuf, CAPITALIZATION::TOLOWER);
+
+        in += strides[0];
+        out += strides[1];
+    }
+
+    return 0;
+}
+
+
+template <ENCODING enc>
+static int
+string_upper_loop(PyArrayMethod_Context *context,
+        char *const data[], npy_intp const dimensions[],
+        npy_intp const strides[], NpyAuxData *NPY_UNUSED(auxdata))
+{
+    int elsize = context->descriptors[0]->elsize;
+    int outsize = context->descriptors[1]->elsize;
+
+    char *in = data[0];
+    char *out = data[1];
+
+    npy_intp N = dimensions[0];
+
+    while (N--) {
+        Buffer<enc> buf(in, elsize);
+        Buffer<enc> outbuf(out, outsize);
+        string_change_capitalization(buf, outbuf, CAPITALIZATION::TOUPPER);
+
+        in += strides[0];
+        out += strides[1];
+    }
+
+    return 0;
+}
+
+
 /* Resolve descriptors & promoter functions */
 
 static NPY_CASTING
@@ -1086,6 +1170,26 @@ string_strip_chars_resolve_descriptors(
 
     Py_INCREF(loop_descrs[0]);
     loop_descrs[2] = loop_descrs[0];
+
+    return NPY_NO_CASTING;
+}
+
+
+static NPY_CASTING
+string_lower_upper_resolve_descriptors(
+        PyArrayMethodObject *NPY_UNUSED(self),
+        PyArray_DTypeMeta *NPY_UNUSED(dtypes[3]),
+        PyArray_Descr *given_descrs[3],
+        PyArray_Descr *loop_descrs[3],
+        npy_intp *NPY_UNUSED(view_offset))
+{
+    loop_descrs[0] = NPY_DT_CALL_ensure_canonical(given_descrs[0]);
+    if (loop_descrs[0] == NULL) {
+        return _NPY_ERROR_OCCURRED_IN_CAST;
+    }
+
+    Py_INCREF(loop_descrs[0]);
+    loop_descrs[1] = loop_descrs[0];
 
     return NPY_NO_CASTING;
 }
@@ -1567,6 +1671,32 @@ init_string_ufuncs(PyObject *umath)
             umath, "_strip_chars", "templated_string_strip", 2, 1, dtypes,
             string_strip_chars_loop<ENCODING::UTF32>,
             string_strip_chars_resolve_descriptors) < 0) {
+        return -1;
+    }
+
+    dtypes[0] = dtypes[1] = NPY_OBJECT;
+    if (init_ufunc<ENCODING::ASCII>(
+            umath, "lower", "templated_string_lower", 1, 1, dtypes,
+            string_lower_loop<ENCODING::ASCII>,
+            string_lower_upper_resolve_descriptors) < 0) {
+        return -1;
+    }
+    if (init_ufunc<ENCODING::UTF32>(
+            umath, "lower", "templated_string_lower", 1, 1, dtypes,
+            string_lower_loop<ENCODING::UTF32>,
+            string_lower_upper_resolve_descriptors) < 0) {
+        return -1;
+    }
+    if (init_ufunc<ENCODING::ASCII>(
+            umath, "upper", "templated_string_upper", 1, 1, dtypes,
+            string_upper_loop<ENCODING::ASCII>,
+            string_lower_upper_resolve_descriptors) < 0) {
+        return -1;
+    }
+    if (init_ufunc<ENCODING::UTF32>(
+            umath, "upper", "templated_string_upper", 1, 1, dtypes,
+            string_upper_loop<ENCODING::UTF32>,
+            string_lower_upper_resolve_descriptors) < 0) {
         return -1;
     }
 
