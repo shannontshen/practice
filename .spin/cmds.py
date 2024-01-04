@@ -32,6 +32,18 @@ def _get_numpy_tools(filename):
     spec.loader.exec_module(module)
     return module
 
+def _gcov_reset_counters():
+    click.secho(
+        "Removing previous GCOV .gcda files...",
+        fg="yellow"
+    )
+    build_dir = pathlib.Path(pathlib.Path.cwd(), "build")
+    for dirpath, dirnames, filenames in os.walk(build_dir):
+        for fn in filenames:
+            if fn.endswith('.gcda') or fn.endswith('.da'):
+                pth = pathlib.Path(dirpath, fn)
+                pathlib.Path.unlink(pth)
+
 
 @click.command()
 @click.argument(
@@ -182,6 +194,12 @@ def docs(ctx, sphinx_target, clean, first_build, jobs):
     "An HTML copy of the report is written to `build/coverage`.",
 )
 @click.option(
+    "--gcov",
+    is_flag=True,
+    help="Enable C code coverage via gcov (requires "
+    "GCC). gcov output goes to build/**/*.gc*",
+)
+@click.option(
     "-j",
     "n_jobs",
     metavar='N_JOBS',
@@ -207,7 +225,7 @@ Which tests to run. Can be a module, function, class, or method:
     '--verbose', '-v', is_flag=True, default=False
 )
 @click.pass_context
-def test(ctx, pytest_args, markexpr, coverage, n_jobs, tests, verbose):
+def test(ctx, pytest_args, markexpr, coverage, gcov, n_jobs, tests, verbose):
     """🔧 Run tests
 
     PYTEST_ARGS are passed through directly to pytest, e.g.:
@@ -256,6 +274,9 @@ def test(ctx, pytest_args, markexpr, coverage, n_jobs, tests, verbose):
             f"--cov-report=html:{coverage_dir}",
             f"--cov=numpy",
         ) + pytest_args
+
+    if gcov:
+        _gcov_reset_counters()
 
     if (n_jobs != "1") and ('-n' not in pytest_args):
         pytest_args = ('-n', str(n_jobs)) + pytest_args
