@@ -314,24 +314,8 @@ def test(
         if markexpr != "full":
             pytest_args = ('-m', markexpr) + pytest_args
 
-    if coverage:
-        coverage_dir = pathlib.Path(pathlib.Path.cwd(), "build/coverage/")
-        if coverage_dir.is_dir():
-            click.secho(
-                f"Removing `{coverage_dir}`",
-                bold=True, fg="bright_green"
-            )
-            shutil.rmtree(coverage_dir)
-        coverage_dir.mkdir(parents=True)
-        pytest_args = (
-            "--cov-report=term",
-            f"--cov-report=html:{coverage_dir}",
-            f"--cov=numpy",
-        ) + pytest_args
-
     if gcov:
         _gcov_reset_counters()
-    breakpoint()
 
     if (n_jobs != "1") and ('-n' not in pytest_args):
         pytest_args = ('-n', str(n_jobs)) + pytest_args
@@ -344,7 +328,7 @@ def test(
 
     ctx.params['pytest_args'] = pytest_args
 
-    for extra_param in ('markexpr', 'n_jobs', 'tests', 'verbose', 'coverage', 'generate_lcov_html'):
+    for extra_param in ('markexpr', 'n_jobs', 'tests', 'verbose', 'generate_lcov_html'):
         del ctx.params[extra_param]
     ctx.forward(meson.test)
 
