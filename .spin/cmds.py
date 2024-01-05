@@ -15,6 +15,8 @@ from spin import util
 from spin.cmds import meson
 
 
+LCOV_OUTPUT_FILE = pathlib.Path("build", "meson-logs", "coveragereport")
+
 # Check that the meson git submodule is present
 curdir = pathlib.Path(__file__).parent
 meson_import_dir = curdir.parent / 'vendored-meson' / 'meson' / 'mesonbuild'
@@ -44,6 +46,23 @@ def _gcov_reset_counters():
                 pth = pathlib.Path(dirpath, fn)
                 pathlib.Path.unlink(pth)
 
+def _generate_lcov_coverage_html():
+    click.secho(
+        "Deleting old HTML coverage report...",
+        fg="yellow"
+    )
+    shutil.rmtree(LCOV_OUTPUT_FILE, ignore_errors=True)
+
+    click.secho(
+        "Generating HTML coverage report...",
+        fg="blue"
+    )
+    cmd = ["ninja", "coverage-html", "-C", "build"]
+    util.run(
+        cmd,
+        echo=True,
+        output=True,
+    )
 
 @click.command()
 @click.argument(
@@ -105,13 +124,18 @@ def changelog(ctx, token, revision_range):
     help="Print all build output, even installation"
 )
 @click.option(
+    "--gcov-build",
+    is_flag=True,
+    help="Enable C code coverage via gcov (requires GCC)",
+)
+@click.option(
     "--with-scipy-openblas", type=click.Choice(["32", "64"]),
     default=None,
     help="Build with pre-installed scipy-openblas32 or scipy-openblas64 wheel"
 )
 @click.argument("meson_args", nargs=-1)
 @click.pass_context
-def build(ctx, meson_args, with_scipy_openblas, jobs=None, clean=False, verbose=False, quiet=False):
+def build(ctx, meson_args, with_scipy_openblas, jobs=None, clean=False, verbose=False, quiet=False, gcov_build=False):
     """🔧 Build package with Meson/ninja and install
 
     MESON_ARGS are passed through e.g.:
@@ -200,6 +224,13 @@ def docs(ctx, sphinx_target, clean, first_build, jobs):
     "GCC). gcov output goes to build/**/*.gc*",
 )
 @click.option(
+    "--generate-lcov-html",
+    is_flag=True,
+    help="produce HTML for C code coverage information "
+    "from a previous run with --gcov. "
+    "HTML output goes to `build/meson-logs/coveragereport/`"
+)
+@click.option(
     "-j",
     "n_jobs",
     metavar='N_JOBS',
@@ -225,7 +256,9 @@ Which tests to run. Can be a module, function, class, or method:
     '--verbose', '-v', is_flag=True, default=False
 )
 @click.pass_context
-def test(ctx, pytest_args, markexpr, coverage, gcov, n_jobs, tests, verbose):
+def test(
+    ctx, pytest_args, markexpr, coverage, gcov, generate_lcov_html, n_jobs, tests, verbose
+):
     """🔧 Run tests
 
     PYTEST_ARGS are passed through directly to pytest, e.g.:
@@ -253,6 +286,10 @@ def test(ctx, pytest_args, markexpr, coverage, gcov, n_jobs, tests, verbose):
 
     For more, see `pytest --help`.
     """  # noqa: E501
+    if generate_lcov_html:
+        _generate_lcov_coverage_html()
+        return
+
     if (not pytest_args) and (not tests):
         pytest_args = ('numpy',)
 
