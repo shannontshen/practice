@@ -65,8 +65,7 @@ jobs:
           command: |
             . venv/bin/activate
             VERSION=$(pip show numpy | grep Version: | cut -d ' ' -f 2 | cut -c 1-5)
-            towncrier build --version $VERSION --yes
-            ./tools/ci/test_all_newsfragments_used.py
+            spin notes --version-override $VERSION
 
       - run:
           name: run doctests on documentation
