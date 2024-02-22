@@ -19,6 +19,7 @@ import pytest
 import contextlib
 import numpy
 import concurrent.futures
+from dataclasses import dataclass, field
 
 from pathlib import Path
 from numpy._utils import asunicode
@@ -74,32 +75,11 @@ def get_temp_module_name():
     return name
 
 
-def _memoize(func):
-    memo = {}
-
-    def wrapper(*a, **kw):
-        key = repr((a, kw))
-        if key not in memo:
-            try:
-                memo[key] = func(*a, **kw)
-            except Exception as e:
-                memo[key] = e
-                raise
-        ret = memo[key]
-        if isinstance(ret, Exception):
-            raise ret
-        return ret
-
-    wrapper.__name__ = func.__name__
-    return wrapper
-
-
 #
 # Building modules
 #
 
 
-@_memoize
 def build_module(source_files, options=[], skip=[], only=[], module_name=None):
     """
     Compile and import a f2py module, built from the given files.
@@ -141,13 +121,12 @@ def build_module(source_files, options=[], skip=[], only=[], module_name=None):
     try:
         os.chdir(d)
         cmd = [sys.executable, "-c", code] + f2py_opts
-        p = subprocess.Popen(cmd,
-                             stdout=subprocess.PIPE,
-                             stderr=subprocess.STDOUT)
+        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         out, err = p.communicate()
         if p.returncode != 0:
-            raise RuntimeError("Running f2py failed: %s\n%s" %
-                               (cmd[4:], asunicode(out)))
+            raise RuntimeError(
+                "Running f2py failed: %s\n%s" % (cmd[4:], asunicode(out))
+            )
     finally:
         os.chdir(cwd)
 
@@ -160,25 +139,19 @@ def build_module(source_files, options=[], skip=[], only=[], module_name=None):
         # If someone starts deleting modules after import, this will
         # need to change to record how big each module is, rather than
         # relying on rebase being able to find that from the files.
-        _module_list.extend(
-            glob.glob(os.path.join(d, "{:s}*".format(module_name)))
-        )
+        _module_list.extend(glob.glob(os.path.join(d, "{:s}*".format(module_name))))
         subprocess.check_call(
-            ["/usr/bin/rebase", "--database", "--oblivious", "--verbose"]
-            + _module_list
+            ["/usr/bin/rebase", "--database", "--oblivious", "--verbose"] + _module_list
         )
 
     # Import
     return import_module(module_name)
 
 
-@_memoize
-def build_code(source_code,
-               options=[],
-               skip=[],
-               only=[],
-               suffix=None,
-               module_name=None):
+# @_memoize
+def build_code(
+    source_code, options=[], skip=[], only=[], suffix=None, module_name=None
+):
     """
     Compile and import Fortran code using f2py.
 
@@ -188,16 +161,15 @@ def build_code(source_code,
     with temppath(suffix=suffix) as path:
         with open(path, "w") as f:
             f.write(source_code)
-        return build_module([path],
-                            options=options,
-                            skip=skip,
-                            only=only,
-                            module_name=module_name)
+        return build_module(
+            [path], options=options, skip=skip, only=only, module_name=module_name
+        )
 
 
 #
 # Check if compilers are available at all...
 #
+
 
 def check_language(lang, code_snippet=None):
     tmpdir = tempfile.mkdtemp()
@@ -229,14 +201,15 @@ def check_language(lang, code_snippet=None):
         shutil.rmtree(tmpdir)
     return False
 
-fortran77_code = '''
+
+fortran77_code = """
 C Example Fortran 77 code
       PROGRAM HELLO
       PRINT *, 'Hello, Fortran 77!'
       END
-'''
+"""
 
-fortran90_code = '''
+fortran90_code = """
 ! Example Fortran 90 code
 program hello90
   type :: greeting
@@ -247,7 +220,8 @@ program hello90
   greet%text = 'hello, fortran 90!'
   print *, greet%text
 end program hello90
-'''
+"""
+
 
 # Dummy class for caching relevant checks
 class CompilerChecker:
@@ -263,7 +237,7 @@ class CompilerChecker:
                 futures = [
                     executor.submit(check_language, "c"),
                     executor.submit(check_language, "fortran", fortran77_code),
-                    executor.submit(check_language, "fortran", fortran90_code)
+                    executor.submit(check_language, "fortran", fortran90_code),
                 ]
 
                 self.has_c = futures[0].result()
@@ -272,17 +246,6 @@ class CompilerChecker:
 
             self.compilers_checked = True
 
-checker = CompilerChecker()
-checker.check_compilers()
-
-def has_c_compiler():
-    return checker.has_c
-
-def has_f77_compiler():
-    return checker.has_f77
-
-def has_f90_compiler():
-    return checker.has_f90
 
 #
 # Building with meson
@@ -340,76 +303,57 @@ def build_meson(source_files, module_name=None, **kwargs):
 
 
 #
-# Unittest convenience
+# Build helpers
 #
 
 
-class F2PyTest:
-    code = None
-    sources = None
-    options = []
-    skip = []
-    only = []
-    suffix = ".f"
-    module = None
-    _has_c_compiler = None
-    _has_f77_compiler = None
-    _has_f90_compiler = None
+@dataclass
+class F2PyModuleSpec:
+    test_class_name: str
+    code: str = None
+    sources: list = field(default_factory=list)
+    options: list = field(default_factory=list)
+    skip: list = field(default_factory=list)
+    only: list = field(default_factory=list)
+    suffix: str = ".f"
+    module_name: str = None
 
-    @property
-    def module_name(self):
-        cls = type(self)
-        return f'_{cls.__module__.rsplit(".",1)[-1]}_{cls.__name__}_ext_module'
-
-    @classmethod
-    def setup_class(cls):
-        if sys.platform == "win32":
-            pytest.skip("Fails with MinGW64 Gfortran (Issue #9673)")
-        F2PyTest._has_c_compiler = has_c_compiler()
-        F2PyTest._has_f77_compiler = has_f77_compiler()
-        F2PyTest._has_f90_compiler = has_f90_compiler()
-
-    def setup_method(self):
-        if self.module is not None:
-            return
-
-        codes = self.sources if self.sources else []
-        if self.code:
-            codes.append(self.suffix)
-
-        needs_f77 = any(str(fn).endswith(".f") for fn in codes)
-        needs_f90 = any(str(fn).endswith(".f90") for fn in codes)
-        needs_pyf = any(str(fn).endswith(".pyf") for fn in codes)
-
-        if needs_f77 and not self._has_f77_compiler:
-            pytest.skip("No Fortran 77 compiler available")
-        if needs_f90 and not self._has_f90_compiler:
-            pytest.skip("No Fortran 90 compiler available")
-        if needs_pyf and not (self._has_f90_compiler or self._has_f77_compiler):
-            pytest.skip("No Fortran compiler available")
-
-        # Build the module
-        if self.code is not None:
-            self.module = build_code(
-                self.code,
-                options=self.options,
-                skip=self.skip,
-                only=self.only,
-                suffix=self.suffix,
-                module_name=self.module_name,
-            )
-
-        if self.sources is not None:
-            self.module = build_module(
-                self.sources,
-                options=self.options,
-                skip=self.skip,
-                only=self.only,
-                module_name=self.module_name,
-            )
+    def __post_init__(self):
+        # Obtain the module path from the current module's __name__
+        # Mimicks this:
+        # cls = type(self)
+        # f'_{cls.__module__.rsplit(".",1)[-1]}_{cls.__name__}_ext_module'
+        if not self.module_name:
+            module_part = __name__.rsplit(".", 1)[-1]
+            self.module_name = f"_{module_part}_{self.test_class_name}_ext_module"
 
 
-#
+def build_module_from_spec(spec):
+    codes = spec.sources if spec.sources else []
+    if spec.code:
+        codes.append(spec.suffix)
+
+    # Build the module based on the spec
+    if spec.code is not None:
+        module = build_code(
+            spec.code,
+            options=spec.options,
+            skip=spec.skip,
+            only=spec.only,
+            suffix=spec.suffix,
+            module_name=spec.module_name,
+        )
+    elif spec.sources is not None:
+        module = build_module(
+            spec.sources,
+            options=spec.options,
+            skip=spec.skip,
+            only=spec.only,
+            module_name=spec.module_name,
+        )
+    return module
+
+
 # Helper functions
 #
 
