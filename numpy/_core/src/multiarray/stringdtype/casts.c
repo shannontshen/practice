@@ -6,8 +6,8 @@
 
 #include "numpy/ndarraytypes.h"
 #include "numpy/arrayobject.h"
-#include "numpy/halffloat.h"
-#include "numpy/npy_math.h"
+#include "numpy/npy_2_npymathcompat.h"
+#include "numpy/npy_2_npymathcompat.h"
 #include "numpy/ufuncobject.h"
 
 #include "common.h"
@@ -855,61 +855,61 @@ string_to_pyfloat(char *in, int has_null,
     return pyfloat_value;
 }
 
-#define STRING_TO_FLOAT_CAST(typename, shortname, isinf_name,                 \
-                             double_to_float)                                 \
-    static int string_to_##                                                   \
-            typename(PyArrayMethod_Context * context, char *const data[],     \
-                     npy_intp const dimensions[], npy_intp const strides[],   \
-                     NpyAuxData *NPY_UNUSED(auxdata))                         \
-    {                                                                         \
-        PyArray_StringDTypeObject *descr =                                    \
-                (PyArray_StringDTypeObject *)context->descriptors[0];         \
-        npy_string_allocator *allocator = NpyString_acquire_allocator(descr); \
-        int has_null = (descr->na_object != NULL);                            \
-        const npy_static_string *default_string = &descr->default_string;     \
-                                                                              \
-        npy_intp N = dimensions[0];                                           \
-        char *in = data[0];                                                   \
-        npy_##typename *out = (npy_##typename *)data[1];                      \
-                                                                              \
-        npy_intp in_stride = strides[0];                                      \
-        npy_intp out_stride = strides[1] / sizeof(npy_##typename);            \
-                                                                              \
-        while (N--) {                                                         \
-            PyObject *pyfloat_value = string_to_pyfloat(                      \
-                    in, has_null, default_string, allocator);                 \
-            if (pyfloat_value == NULL) {                                      \
-                goto fail;                                                    \
-            }                                                                 \
-            double dval = PyFloat_AS_DOUBLE(pyfloat_value);                   \
-            npy_##typename fval = (double_to_float)(dval);                    \
-                                                                              \
-            if (NPY_UNLIKELY(isinf_name(fval) && !(npy_isinf(dval)))) {       \
-                if (PyUFunc_GiveFloatingpointErrors("cast",                   \
-                                                    NPY_FPE_OVERFLOW) < 0) {  \
-                    goto fail;                                                \
-                }                                                             \
-            }                                                                 \
-                                                                              \
-            *out = fval;                                                      \
-                                                                              \
-            in += in_stride;                                                  \
-            out += out_stride;                                                \
-        }                                                                     \
-                                                                              \
-        NpyString_release_allocator(allocator);                               \
-        return 0;                                                             \
-    fail:                                                                     \
-        NpyString_release_allocator(allocator);                               \
-        return -1;                                                            \
-    }                                                                         \
-                                                                              \
-    static PyType_Slot s2##shortname##_slots[] = {                            \
-            {NPY_METH_resolve_descriptors,                                    \
-             &string_to_##typename##_resolve_descriptors},                    \
-            {NPY_METH_strided_loop, &string_to_##typename},                   \
-            {0, NULL}};                                                       \
-                                                                              \
+#define STRING_TO_FLOAT_CAST(typename, shortname, isinf_name,                    \
+                             double_to_float)                                    \
+    static int string_to_##                                                      \
+            typename(PyArrayMethod_Context * context, char *const data[],        \
+                     npy_intp const dimensions[], npy_intp const strides[],      \
+                     NpyAuxData *NPY_UNUSED(auxdata))                            \
+    {                                                                            \
+        PyArray_StringDTypeObject *descr =                                       \
+                (PyArray_StringDTypeObject *)context->descriptors[0];            \
+        npy_string_allocator *allocator = NpyString_acquire_allocator(descr);    \
+        int has_null = (descr->na_object != NULL);                               \
+        const npy_static_string *default_string = &descr->default_string;        \
+                                                                                 \
+        npy_intp N = dimensions[0];                                              \
+        char *in = data[0];                                                      \
+        npy_##typename *out = (npy_##typename *)data[1];                         \
+                                                                                 \
+        npy_intp in_stride = strides[0];                                         \
+        npy_intp out_stride = strides[1] / sizeof(npy_##typename);               \
+                                                                                 \
+        while (N--) {                                                            \
+            PyObject *pyfloat_value = string_to_pyfloat(                         \
+                    in, has_null, default_string, allocator);                    \
+            if (pyfloat_value == NULL) {                                         \
+                goto fail;                                                       \
+            }                                                                    \
+            double dval = PyFloat_AS_DOUBLE(pyfloat_value);                      \
+            npy_##typename fval = (double_to_float)(dval);                       \
+                                                                                 \
+            if (NPY_UNLIKELY(isinf_name(fval) && !(npymath_isinf(dval)))) {      \
+                if (PyUFunc_GiveFloatingpointErrors("cast",                      \
+                                                    NPYMATH_FPE_OVERFLOW) < 0) { \
+                    goto fail;                                                   \
+                }                                                                \
+            }                                                                    \
+                                                                                 \
+            *out = fval;                                                         \
+                                                                                 \
+            in += in_stride;                                                     \
+            out += out_stride;                                                   \
+        }                                                                        \
+                                                                                 \
+        NpyString_release_allocator(allocator);                                  \
+        return 0;                                                                \
+    fail:                                                                        \
+        NpyString_release_allocator(allocator);                                  \
+        return -1;                                                               \
+    }                                                                            \
+                                                                                 \
+    static PyType_Slot s2##shortname##_slots[] = {                               \
+            {NPY_METH_resolve_descriptors,                                       \
+             &string_to_##typename##_resolve_descriptors},                       \
+            {NPY_METH_strided_loop, &string_to_##typename},                      \
+            {0, NULL}};                                                          \
+                                                                                 \
     static char *s2##shortname##_name = "cast_StringDType_to_" #typename;
 
 #define STRING_TO_FLOAT_RESOLVE_DESCRIPTORS(typename, npy_typename)        \
@@ -1025,12 +1025,12 @@ static char *s2f64_name = "cast_StringDType_to_float64";
 FLOAT_TO_STRING_CAST(float64, f64, double)
 
 STRING_TO_FLOAT_RESOLVE_DESCRIPTORS(float32, FLOAT)
-STRING_TO_FLOAT_CAST(float32, f32, npy_isinf, npy_float32)
+STRING_TO_FLOAT_CAST(float32, f32, npymath_isinf, npy_float32)
 FLOAT_TO_STRING_CAST(float32, f32, double)
 
 STRING_TO_FLOAT_RESOLVE_DESCRIPTORS(float16, HALF)
-STRING_TO_FLOAT_CAST(float16, f16, npy_half_isinf, npy_double_to_half)
-FLOAT_TO_STRING_CAST(float16, f16, npy_half_to_double)
+STRING_TO_FLOAT_CAST(float16, f16, npymath_half_isinf, npymath_double_to_half)
+FLOAT_TO_STRING_CAST(float16, f16, npymath_half_to_double)
 
 // string to longdouble
 
@@ -1169,8 +1169,8 @@ string_to_pycomplex(char *in, int has_null,
                 goto fail;                                                       \
             }                                                                    \
                                                                                  \
-            npy_csetreal##suffix(out, (npy_##ftype) complex_value.real);         \
-            npy_csetimag##suffix(out, (npy_##ftype) complex_value.imag);         \
+            npymath_csetreal##suffix(out, (npy_##ftype) complex_value.real);     \
+            npymath_csetimag##suffix(out, (npy_##ftype) complex_value.imag);     \
             in += in_stride;                                                     \
             out += out_stride;                                                   \
         }                                                                        \

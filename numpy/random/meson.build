@@ -1,15 +1,37 @@
 # Build npyrandom library
 # -----------------------
-npyrandom_sources = [
+libnpyrandom_sources = [
   'src/distributions/logfactorial.c',
   'src/distributions/distributions.c',
   'src/distributions/random_mvhg_count.c',
   'src/distributions/random_mvhg_marginals.c',
   'src/distributions/random_hypergeometric.c',
 ]
+libnpyrandom_headers = [
+  'src/distributions/logfactorial.h',
+  'src/distributions/ziggurat_constants.h'
+]
+libnpyrandom_dep = declare_dependency(sources: libnpyrandom_sources)
+install_data(
+  [libnpyrandom_sources, libnpyrandom_headers],
+  install_dir: np_dir / 'random' / 'src' / 'distributions'
+)
 
+# We install libnpymath and libnpyrandom; ensure they're using a `.lib` rather
+# than a `.a` file extension in order not to break including them in a
+# distutils-based build (see gh-23981 and
+# https://mesonbuild.com/FAQ.html#why-does-building-my-project-with-msvc-output-static-libraries-called-libfooa)
+if is_windows and cc.get_id() == 'msvc'
+  name_prefix_staticlib = ''
+  name_suffix_staticlib = 'lib'
+else
+  name_prefix_staticlib = []
+  name_suffix_staticlib = []
+endif
+
+# Not used anymore, shipped for backwards-compatibility
 npyrandom_lib = static_library('npyrandom',
-  npyrandom_sources,
+  libnpyrandom_sources,
   c_args: staticlib_cflags,
   dependencies: [py_dep, np_core_dep],
   install: true,
@@ -17,6 +39,7 @@ npyrandom_lib = static_library('npyrandom',
   name_prefix: name_prefix_staticlib,
   name_suffix: name_suffix_staticlib,
 )
+
 
 # Build Cython extensions for numpy.random
 # ----------------------------------------
@@ -54,24 +77,24 @@ endif
 
 # name, sources, extra c_args, extra static libs to link
 random_pyx_sources = [
-  ['_bounded_integers', _bounded_integers_pyx, [], [npyrandom_lib, npymath_lib]],
-  ['_common', '_common.pyx', [], [npyrandom_lib]],
+  ['_bounded_integers', _bounded_integers_pyx, [], [libnpymath_dep, libnpyrandom_dep]],
+  ['_common', '_common.pyx', [], [libnpymath_dep, libnpyrandom_dep]],
   ['_mt19937', ['_mt19937.pyx', 'src/mt19937/mt19937.c', 'src/mt19937/mt19937-jump.c'],
-    [], [npyrandom_lib]
+    [], [libnpymath_dep, libnpyrandom_dep]
   ],
-  ['_philox', ['_philox.pyx', 'src/philox/philox.c'], [], [npyrandom_lib]],
-  ['_pcg64', ['_pcg64.pyx', 'src/pcg64/pcg64.c'], ['-U__GNUC_GNU_INLINE__'], [npyrandom_lib]],
-  ['_sfc64', ['_sfc64.pyx', 'src/sfc64/sfc64.c'], [], [npyrandom_lib]],
-  ['bit_generator', 'bit_generator.pyx', [], [npyrandom_lib]],
+  ['_philox', ['_philox.pyx', 'src/philox/philox.c'], [], [libnpymath_dep, libnpyrandom_dep]],
+  ['_pcg64', ['_pcg64.pyx', 'src/pcg64/pcg64.c'], ['-U__GNUC_GNU_INLINE__'], [libnpymath_dep, libnpyrandom_dep]],
+  ['_sfc64', ['_sfc64.pyx', 'src/sfc64/sfc64.c'], [], [libnpymath_dep, libnpyrandom_dep]],
+  ['bit_generator', 'bit_generator.pyx', [], [libnpymath_dep, libnpyrandom_dep]],
   # The `fs.copyfile` usage here is needed because these two .pyx files import
   # from _bounded_integers,and its pxd file is only present in the build directory
-  ['_generator', fs.copyfile('_generator.pyx'), [], [npyrandom_lib, npymath_lib]],
+  ['_generator', fs.copyfile('_generator.pyx'), [], [libnpymath_dep, libnpyrandom_dep]],
   ['mtrand', [
       fs.copyfile('mtrand.pyx'),
       'src/distributions/distributions.c',
       'src/legacy/legacy-distributions.c'
     ],
-    ['-DNP_RANDOM_LEGACY=1'], [npymath_lib],
+    ['-DNP_RANDOM_LEGACY=1'], [libnpymath_dep],
   ],
 ]
 foreach gen: random_pyx_sources
@@ -79,8 +102,7 @@ foreach gen: random_pyx_sources
     [gen[1], _cython_tree, _cython_tree_random],
     c_args: [c_args_random, gen[2]],
     include_directories: 'src',
-    dependencies: np_core_dep,
-    link_with: gen[3],
+    dependencies: [np_core_dep, gen[3]],
     install: true,
     subdir: 'numpy/random',
   )

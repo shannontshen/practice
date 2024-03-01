@@ -5,7 +5,7 @@
 #include <Python.h>
 
 #include "numpy/arrayobject.h"
-#include "numpy/npy_math.h"
+#include "numpy/npy_2_npymathcompat.h"
 
 #include "npy_config.h"
 
@@ -301,21 +301,21 @@ fix_ascii_format(char* buf, size_t buflen, int decimal)
                                    const char *format,                  \
                                    type val, int decimal)               \
     {                                                                   \
-        if (npy_isfinite(val)) {                                        \
+        if (npymath_isfinite(val)) {                                        \
             if (check_ascii_format(format)) {                           \
                 return NULL;                                            \
             }                                                           \
             PyOS_snprintf(buffer, buf_size, format, (print_type)val);   \
             return fix_ascii_format(buffer, buf_size, decimal);         \
         }                                                               \
-        else if (npy_isnan(val)){                                       \
+        else if (npymath_isnan(val)){                                       \
             if (buf_size < 4) {                                         \
                 return NULL;                                            \
             }                                                           \
             strcpy(buffer, "nan");                                      \
         }                                                               \
         else {                                                          \
-            if (npy_signbit(val)) {                                     \
+            if (npymath_signbit(val)) {                                     \
                 if (buf_size < 5) {                                     \
                     return NULL;                                        \
                 }                                                       \
@@ -514,7 +514,7 @@ NumPyOS_ascii_strtod(const char *s, char** endptr)
         if (endptr != NULL) {
             *endptr = (char*)p;
         }
-        return NPY_NAN;
+        return NPYMATH_NAN;
     }
     else if (NumPyOS_ascii_strncasecmp(p, "inf", 3) == 0) {
         p += 3;
@@ -524,7 +524,7 @@ NumPyOS_ascii_strtod(const char *s, char** endptr)
         if (endptr != NULL) {
             *endptr = (char*)p;
         }
-        return result*NPY_INFINITY;
+        return result*NPYMATH_INFINITY;
     }
     /* End of ##1 */
 
@@ -572,7 +572,7 @@ NumPyOS_ascii_strtold(const char *s, char** endptr)
         if (endptr != NULL) {
             *endptr = (char*)p;
         }
-        return NPY_NAN;
+        return NPYMATH_NAN;
     }
     else if (NumPyOS_ascii_strncasecmp(p, "inf", 3) == 0) {
         p += 3;
@@ -582,7 +582,7 @@ NumPyOS_ascii_strtold(const char *s, char** endptr)
         if (endptr != NULL) {
             *endptr = (char*)p;
         }
-        return result*NPY_INFINITY;
+        return result*NPYMATH_INFINITY;
     }
     /* End of ##1 */
 

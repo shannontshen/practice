@@ -61,7 +61,7 @@ _error_handler(const char *name, int method, PyObject *pyfunc, char *errtype,
                int retstatus);
 
 
-#define HANDLEIT(NAME, str) {if (retstatus & NPY_FPE_##NAME) {          \
+#define HANDLEIT(NAME, str) {if (retstatus & NPYMATH_FPE_##NAME) {          \
             handle = errmask & UFUNC_MASK_##NAME;                       \
             if (handle &&                                               \
                 _error_handler(name, handle >> UFUNC_SHIFT_##NAME,      \
@@ -509,8 +509,8 @@ _extract_pyvals(int *bufsize, int *errmask, PyObject **pyfunc)
 /*UFUNC_API
  * Signal a floating point error respecting the error signaling setting in
  * the NumPy errstate. Takes the name of the operation to use in the error
- * message and an integer flag that is one of NPY_FPE_DIVIDEBYZERO,
- * NPY_FPE_OVERFLOW, NPY_FPE_UNDERFLOW, NPY_FPE_INVALID to indicate
+ * message and an integer flag that is one of NPYMATH_FPE_DIVIDEBYZERO,
+ * NPYMATH_FPE_OVERFLOW, NPYMATH_FPE_UNDERFLOW, NPYMATH_FPE_INVALID to indicate
  * which errors to check for.
  *
  * Returns -1 on failure (an error was raised) and 0 on success.
@@ -550,7 +550,7 @@ _check_ufunc_fperr(int errmask, const char *ufunc_name) {
     if (!errmask) {
         return 0;
     }
-    fperr = npy_get_floatstatus_barrier((char*)ufunc_name);
+    fperr = npymath_get_floatstatus_barrier((char*)ufunc_name);
     if (!fperr) {
         return 0;
     }

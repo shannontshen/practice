@@ -8,7 +8,7 @@
 
 #include "numpy/arrayobject.h"
 #include "numpy/ndarraytypes.h"
-#include "numpy/npy_math.h"
+#include "numpy/npy_2_npymathcompat.h"
 
 #include "static_string.h"
 #include "dtypemeta.h"
@@ -169,7 +169,7 @@ na_eq_cmp(PyObject *a, PyObject *b) {
         if (b_float == -1.0 && PyErr_Occurred()) {
             return -1;
         }
-        if (npy_isnan(a_float) && npy_isnan(b_float)) {
+        if (npymath_isnan(a_float) && npymath_isnan(b_float)) {
             return 1;
         }
     }
