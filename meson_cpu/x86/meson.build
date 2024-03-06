@@ -60,7 +60,7 @@ FMA3 = mod_features.new(
   test_code: files(source_root + '/numpy/distutils/checks/cpu_fma3.c')[0]
 )
 AVX2 = mod_features.new(
-  'AVX2', 25, implies: F16C, args: '-march=skylake',
+  'AVX2', 25, implies: F16C, args: ['-maes', '-march=haswell'],
   test_code: files(source_root + '/numpy/distutils/checks/cpu_avx2.c')[0]
 )
 # 25-40 left as margin for any extra features
