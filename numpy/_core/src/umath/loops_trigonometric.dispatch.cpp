@@ -1,5 +1,6 @@
 #include "fast_loop_macros.h"
 #include "highway_transform.h"
+#include "highway_masked_func.h"
 #include "loops.h"
 #include "loops_utils.h"
 
@@ -167,34 +168,11 @@ simd_sincos_f32(const float *src, npy_intp ssrc, float *dst, npy_intp sdst,
                                            hn::Set(f32, NPY_NANF));
                 }
 
-                if (!hn::AllTrue(f32, simd_mask)) {
-                    npy_uint64 simd_maski;
-                    hn::StoreMaskBits(f32, simd_mask, (uint8_t *)&simd_maski);
-                    float NPY_DECL_ALIGNED(NPY_SIMD_WIDTH)
-                            ip_fback[hn::Lanes(f32)];
-                    hn::Store(x_in, f32, ip_fback);
-
-                    // process elements using libc for large elements
-                    if (trig_op == SIMD_COMPUTE_COS) {
-                        for (unsigned i = 0; i < hn::Lanes(f32); ++i) {
-                            if ((simd_maski >> i) & 1) {
-                                continue;
-                            }
-                            ip_fback[i] = npy_cosf(ip_fback[i]);
-                        }
-                    }
-                    else {
-                        for (unsigned i = 0; i < hn::Lanes(f32); ++i) {
-                            if ((simd_maski >> i) & 1) {
-                                continue;
-                            }
-                            ip_fback[i] = npy_sinf(ip_fback[i]);
-                        }
-                    }
-
-                    // Merge updates back into x_in
-                    vec_f32 specialcase_x = hn::Load(f32, ip_fback);
-                    x_out = hn::IfThenElse(simd_mask, x_out, specialcase_x);
+                // Any remaining values we can use libc
+                if (trig_op == SIMD_COMPUTE_COS) {
+                    x_out = hn::MaskedCallFunc1(f32, x_in, x_out, simd_mask, npy_cosf);
+                } else {
+                    x_out = hn::MaskedCallFunc1(f32, x_in, x_out, simd_mask, npy_sinf);
                 }
 
                 return x_out;
