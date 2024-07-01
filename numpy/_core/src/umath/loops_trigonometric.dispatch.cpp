@@ -212,22 +212,17 @@ NPY_CPU_DISPATCH_CURFX(FLOAT_sin)(char **args, npy_intp const *dimensions,
     const npy_intp sdst = steps[1] / lsize;
     npy_intp len = dimensions[0];
     assert(len <= 1 || (steps[0] % lsize == 0 && steps[1] % lsize == 0));
-    if (is_mem_overlap(src, steps[0], dst, steps[1], len) ||
-        !npyv_loadable_stride_f32(ssrc) || !npyv_storable_stride_f32(sdst)) {
-        for (; len > 0; --len, src += ssrc, dst += sdst) {
-            simd_sincos_f32(src, 1, dst, 1, 1, SIMD_COMPUTE_SIN);
-        }
-    }
-    else {
+    if (!is_mem_overlap(src, steps[0], dst, steps[1], len) &&
+        npyv_loadable_stride_f32(ssrc) && npyv_storable_stride_f32(sdst)) {
         simd_sincos_f32(src, ssrc, dst, sdst, len, SIMD_COMPUTE_SIN);
+        return;
     }
-#else
+#endif
     UNARY_LOOP
     {
         const npy_float in1 = *(npy_float *)ip1;
         *(npy_float *)op1 = npy_sinf(in1);
     }
-#endif
 }
 
 NPY_NO_EXPORT void
@@ -244,20 +239,15 @@ NPY_CPU_DISPATCH_CURFX(FLOAT_cos)(char **args, npy_intp const *dimensions,
     const npy_intp sdst = steps[1] / lsize;
     npy_intp len = dimensions[0];
     assert(len <= 1 || (steps[0] % lsize == 0 && steps[1] % lsize == 0));
-    if (is_mem_overlap(src, steps[0], dst, steps[1], len) ||
-        !npyv_loadable_stride_f32(ssrc) || !npyv_storable_stride_f32(sdst)) {
-        for (; len > 0; --len, src += ssrc, dst += sdst) {
-            simd_sincos_f32(src, 1, dst, 1, 1, SIMD_COMPUTE_COS);
-        }
-    }
-    else {
+    if (!is_mem_overlap(src, steps[0], dst, steps[1], len) &&
+        npyv_loadable_stride_f32(ssrc) && npyv_storable_stride_f32(sdst)) {
         simd_sincos_f32(src, ssrc, dst, sdst, len, SIMD_COMPUTE_COS);
+        return;
     }
-#else
+#endif
     UNARY_LOOP
     {
         const npy_float in1 = *(npy_float *)ip1;
         *(npy_float *)op1 = npy_cosf(in1);
     }
-#endif
 }
