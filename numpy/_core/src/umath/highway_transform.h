@@ -68,5 +68,6 @@ Transform1(D d, const T *HWY_RESTRICT in, const npy_intp in_stride,
 
 }  // namespace HWY_NAMESPACE
 }  // namespace hwy
+HWY_AFTER_NAMESPACE();
 
 #endif

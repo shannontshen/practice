@@ -39,5 +39,6 @@ MaskedCallFunc1(D d, Vec<D> orig_x, Vec<D> transformed_x, Mask<D> mask, const Fu
 
 }  // namespace HWY_NAMESPACE
 }  // namespace hwy
+HWY_AFTER_NAMESPACE();
 
 #endif
