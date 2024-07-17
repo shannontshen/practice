@@ -5,6 +5,7 @@
 #include <hwy/highway.h>
 #include <numpy/npy_common.h>
 
+#if NPY_SIMD
 HWY_BEFORE_NAMESPACE();
 namespace hwy {
 namespace HWY_NAMESPACE {
@@ -41,4 +42,5 @@ MaskedCallFunc1(D d, Vec<D> orig_x, Vec<D> transformed_x, Mask<D> mask, const Fu
 }  // namespace hwy
 HWY_AFTER_NAMESPACE();
 
+#endif // NPY_SIMD
 #endif

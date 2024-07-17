@@ -5,6 +5,7 @@
 #include <hwy/highway.h>
 #include <numpy/npy_common.h>
 
+#if NPY_SIMD
 HWY_BEFORE_NAMESPACE();
 namespace hwy {
 namespace HWY_NAMESPACE {
@@ -70,4 +71,5 @@ Transform1(D d, const T *HWY_RESTRICT in, const npy_intp in_stride,
 }  // namespace hwy
 HWY_AFTER_NAMESPACE();
 
+#endif // NPY_SIMD
 #endif
