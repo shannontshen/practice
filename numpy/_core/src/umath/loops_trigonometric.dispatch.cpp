@@ -113,7 +113,7 @@ simd_sincos_f32(const float *src, npy_intp ssrc, float *dst, npy_intp sdst,
 
     hn::Transform1(
             f32, src, ssrc, dst, sdst, len,
-            [&](vec_f32 &x_in) HWY_ATTR -> vec_f32 {
+            [&](vec_f32 &x_in) -> vec_f32 HWY_ATTR {
                 /*
                  * For elements outside of this range, Cody-Waite's range
                  * reduction becomes inaccurate and we will call libc to
