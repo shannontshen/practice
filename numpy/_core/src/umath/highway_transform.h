@@ -51,7 +51,7 @@ Transform1(D d, const T *HWY_RESTRICT in, const npy_intp in_stride,
         return;
 
     const size_t remaining = count - idx;
-    HWY_DASSERT(0 != remaining && remaining < count);
+    HWY_DASSERT(0 != remaining && remaining < lanes);
     if (in_stride == 1) {
         v = LoadN(d, in, remaining);
     }
