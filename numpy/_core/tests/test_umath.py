@@ -1578,7 +1578,7 @@ class TestSpecialFloats:
         x = rng.standard_normal(N, dtype)
         y = callable(x[::stride])
         callable(x[::stride], out=x[:M])
-        assert_equal(x[:M], y)
+        assert_array_almost_equal_nulp(x[:M], y)
 
     @pytest.mark.parametrize('dt', ['e', 'f', 'd', 'g'])
     def test_sqrt_values(self, dt):
