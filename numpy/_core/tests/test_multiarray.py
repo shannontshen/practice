@@ -7223,24 +7223,24 @@ class TestMatmul(MatmulCommon):
     vr = np.arange(6.)
     m0 = np.zeros((3, 0))
     @pytest.mark.parametrize('args', (
-            # matrix-matrix
-            (m1, m2), (m2.T, m1.T), (m2.T.copy(), m1.T), (m2.T, m1.T.copy()),
-            # matrix-matrix-transpose, contiguous and non
-            (m1, m1.T), (m1.T, m1), (m1, m3.T), (m3, m1.T),
-            (m3, m3.T), (m3.T, m3),
-            # matrix-matrix non-contiguous
-            (m3, m2), (m2.T, m3.T), (m2.T.copy(), m3.T),
-            # vector-matrix, matrix-vector, contiguous
-            (m1, vr[:3]), (vc[:5], m1), (m1.T, vc[:5]), (vr[:3], m1.T),
-            # vector-matrix, matrix-vector, vector non-contiguous
-            (m1, vr[::2]), (vc[::2], m1), (m1.T, vc[::2]), (vr[::2], m1.T),
-            # vector-matrix, matrix-vector, matrix non-contiguous
-            (m3, vr[:3]), (vc[:5], m3), (m3.T, vc[:5]), (vr[:3], m3.T),
-            # vector-matrix, matrix-vector, both non-contiguous
-            (m3, vr[::2]), (vc[::2], m3), (m3.T, vc[::2]), (vr[::2], m3.T),
-            # size == 0
-            (m0, m0.T), (m0.T, m0), (m1, m0), (m0.T, m1.T),
-        ))
+        # matrix-matrix
+        (m1, m2), (m2.T, m1.T), (m2.T.copy(), m1.T), (m2.T, m1.T.copy()),
+        # matrix-matrix-transpose, contiguous and non
+        (m1, m1.T), (m1.T, m1), (m1, m3.T), (m3, m1.T),
+        (m3, m3.T), (m3.T, m3),
+        # matrix-matrix non-contiguous
+        (m3, m2), (m2.T, m3.T), (m2.T.copy(), m3.T),
+        # vector-matrix, matrix-vector, contiguous
+        (m1, vr[:3]), (vc[:5], m1), (m1.T, vc[:5]), (vr[:3], m1.T),
+        # vector-matrix, matrix-vector, vector non-contiguous
+        (m1, vr[::2]), (vc[::2], m1), (m1.T, vc[::2]), (vr[::2], m1.T),
+        # vector-matrix, matrix-vector, matrix non-contiguous
+        (m3, vr[:3]), (vc[:5], m3), (m3.T, vc[:5]), (vr[:3], m3.T),
+        # vector-matrix, matrix-vector, both non-contiguous
+        (m3, vr[::2]), (vc[::2], m3), (m3.T, vc[::2]), (vr[::2], m3.T),
+        # size == 0
+        (m0, m0.T), (m0.T, m0), (m1, m0), (m0.T, m1.T),
+    ))
     def test_dot_equivalent(self, args):
         r1 = np.matmul(*args)
         r2 = np.dot(*args)

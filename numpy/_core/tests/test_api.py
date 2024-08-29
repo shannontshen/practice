@@ -7,7 +7,7 @@ import pytest
 from numpy.testing import (
      assert_, assert_equal, assert_array_equal, assert_raises, assert_warns,
      HAS_REFCOUNT
-    )
+     )
 
 
 def test_array_array():

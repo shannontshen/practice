@@ -928,9 +928,8 @@ def fromfile(fd, dtype=None, shape=None, offset=0, formats=None,
 
         if nbytes > size:
             raise ValueError(
-                    "Not enough bytes left in file for specified "
-                    "shape and type."
-                )
+                "Not enough bytes left in file for specified shape and type."
+            )
 
         # create the array
         _array = recarray(shape, descr)

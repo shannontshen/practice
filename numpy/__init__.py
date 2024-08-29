@@ -280,7 +280,7 @@ else:
     __former_attrs__ = {
          n: _msg.format(n=n, extended_msg=extended_msg)
          for n, extended_msg in _type_info
-     }
+    }
 
 
     # Some of these could be defined right away, but most were aliases to

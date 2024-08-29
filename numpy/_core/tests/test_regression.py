@@ -176,9 +176,9 @@ class TestRegression:
     def test_endian_recarray(self):
         # Ticket #2185
         dt = np.dtype([
-               ('head', '>u4'),
-               ('data', '>u4', 2),
-            ])
+            ('head', '>u4'),
+            ('data', '>u4', 2),
+        ])
         buf = np.recarray(1, dtype=dt)
         buf[0]['head'] = 1
         buf[0]['data'][:] = [1, 1]

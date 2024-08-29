@@ -686,9 +686,9 @@ class TestBlock:
         result = block([
             [
                 block([
-                   [one],
-                   [three],
-                   [four]
+                    [one],
+                    [three],
+                    [four]
                 ]),
                 two
             ],

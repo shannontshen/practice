@@ -70,8 +70,8 @@ def get_rtol(dtype):
 
 # used to categorize tests
 all_tags = {
-  'square', 'nonsquare', 'hermitian',  # mutually exclusive
-  'generalized', 'size-0', 'strided' # optional additions
+    'square', 'nonsquare', 'hermitian',  # mutually exclusive
+    'generalized', 'size-0', 'strided' # optional additions
 }
 
 

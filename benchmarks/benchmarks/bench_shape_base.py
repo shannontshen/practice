@@ -52,9 +52,9 @@ class Block(Benchmark):
         np.block([
             [
                 np.block([
-                   [self.one],
-                   [self.three],
-                   [self.four]
+                    [self.one],
+                    [self.three],
+                    [self.four]
                 ]),
                 self.two
             ],

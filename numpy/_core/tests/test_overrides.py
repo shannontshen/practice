@@ -425,10 +425,10 @@ class TestArrayFunctionImplementation:
         assert repr_no_id == repr_no_id_impl
 
     @pytest.mark.parametrize("func", [
-            lambda x, y: 0,  # no like argument
-            lambda like=None: 0,  # not keyword only
-            lambda *, like=None, a=3: 0,  # not last (not that it matters)
-        ])
+        lambda x, y: 0,  # no like argument
+        lambda like=None: 0,  # not keyword only
+        lambda *, like=None, a=3: 0,  # not last (not that it matters)
+    ])
     def test_bad_like_sig(self, func):
         # We sanity check the signature, and these should fail.
         with pytest.raises(RuntimeError):

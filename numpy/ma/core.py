@@ -8809,9 +8809,9 @@ frombuffer = _convert2ma(
     np_ma_ret='out: MaskedArray',
 )
 fromfunction = _convert2ma(
-   'fromfunction',
-   np_ret='fromfunction : any',
-   np_ma_ret='fromfunction: MaskedArray',
+    'fromfunction',
+    np_ret='fromfunction : any',
+    np_ma_ret='fromfunction: MaskedArray',
 )
 identity = _convert2ma(
     'identity',

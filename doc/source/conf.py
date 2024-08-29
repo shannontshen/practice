@@ -306,10 +306,10 @@ latex_engine = 'xelatex'
 # (source start file, target name, title, author, document class [howto/manual]).
 _stdauthor = 'Written by the NumPy community'
 latex_documents = [
-  ('reference/index', 'numpy-ref.tex', 'NumPy Reference',
-   _stdauthor, 'manual'),
-  ('user/index', 'numpy-user.tex', 'NumPy User Guide',
-   _stdauthor, 'manual'),
+    ('reference/index', 'numpy-ref.tex', 'NumPy Reference',
+    _stdauthor, 'manual'),
+    ('user/index', 'numpy-user.tex', 'NumPy User Guide',
+    _stdauthor, 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -388,10 +388,10 @@ latex_use_modindex = False
 # -----------------------------------------------------------------------------
 
 texinfo_documents = [
-  ("index", 'numpy', 'NumPy Documentation', _stdauthor, 'NumPy',
-   "NumPy: array processing for numbers, strings, records, and objects.",
-   'Programming',
-   1),
+    ("index", 'numpy', 'NumPy Documentation', _stdauthor, 'NumPy',
+     "NumPy: array processing for numbers, strings, records, and objects.",
+     'Programming',
+     1),
 ]
 
 
@@ -569,10 +569,10 @@ def linkcode_resolve(domain, info):
 
     if 'dev' in numpy.__version__:
         return "https://github.com/numpy/numpy/blob/main/numpy/%s%s" % (
-           fn, linespec)
+            fn, linespec)
     else:
         return "https://github.com/numpy/numpy/blob/v%s/numpy/%s%s" % (
-           numpy.__version__, fn, linespec)
+            numpy.__version__, fn, linespec)
 
 from pygments.lexers import CLexer
 from pygments.lexer import inherit

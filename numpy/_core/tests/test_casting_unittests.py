@@ -775,7 +775,7 @@ class TestCasting:
             ("V4", "i4", None),
             # completely invalid/impossible cast:
             ("i,i", "i,i,i", None),
-        ])
+    ])
     def test_structured_view_offsets_paramteric(
             self, from_dt, to_dt, expected_off):
         # TODO: While this test is fairly thorough, right now, it does not
