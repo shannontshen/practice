@@ -1097,7 +1097,9 @@ def test_pyscalar_subclasses(subtype, __op__, __rop__, op, cmp):
 
     # When no deferring is indicated, subclasses are handled normally.
     myt = type("myt", (subtype,), {__rop__: rop_func})
-    behaves_like = lambda x: np.array(subtype(x))[()]
+
+    def behaves_like(x):
+        return np.array(subtype(x))[()]
 
     # Check for float32, as a float subclass float64 may behave differently
     res = op(myt(1), np.float16(2))
@@ -1141,7 +1143,9 @@ def test_scalar_matches_array_op_with_pyscalar(op, sctype, other_type, rop):
 
     if rop:
         _op = op
-        op = lambda x, y: _op(y, x)
+
+        def op(x, y):
+            return _op(y, x)
 
     try:
         res = op(val1, val2)

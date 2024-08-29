@@ -60,10 +60,12 @@ def interesting_binop_operands(val1, val2, dtype):
     arr1[0] = val1
     arr2[0] = val2
 
-    extractor = lambda res: res
+    def extractor(res):
+        return res
     yield arr1[0], arr2[0], extractor, "scalars"
 
-    extractor = lambda res: res
+    def extractor(res):
+        return res
     yield arr1[0, ...], arr2[0, ...], extractor, "scalar-arrays"
 
     # reset array values to fill_value:
@@ -74,7 +76,8 @@ def interesting_binop_operands(val1, val2, dtype):
         arr1[pos] = val1
         arr2[pos] = val2
 
-        extractor = lambda res: res[pos]
+        def extractor(res):
+            return res[pos]
         yield arr1, arr2, extractor, f"off-{pos}"
         yield arr1, arr2[pos], extractor, f"off-{pos}-with-scalar"
 
@@ -87,7 +90,8 @@ def interesting_binop_operands(val1, val2, dtype):
         op1[10] = val1
         op2[10] = val2
 
-        extractor = lambda res: res[10]
+        def extractor(res):
+            return res[10]
         yield op1, op2, extractor, f"stride-{stride}"
 
         op1[10] = fill_value
@@ -421,8 +425,12 @@ class TestComparisons:
     def test_unsigned_signed_direct_comparison(
             self, dtype, py_comp_func, np_comp_func, flip):
         if flip:
-            py_comp = lambda x, y: py_comp_func(y, x)
-            np_comp = lambda x, y: np_comp_func(y, x)
+
+            def py_comp(x, y):
+                return py_comp_func(y, x)
+
+            def np_comp(x, y):
+                return np_comp_func(y, x)
         else:
             py_comp = py_comp_func
             np_comp = np_comp_func
@@ -499,11 +507,14 @@ class TestDivision:
         a, b, divisors = eval(ex_val)
         a_lst, b_lst = a.tolist(), b.tolist()
 
-        c_div = lambda n, d: (
-            0 if d == 0 else (
-                fo.min if (n and n == fo.min and d == -1) else n//d
-            )
-        )
+        def c_div(n, d):
+            if d == 0:
+                return 0
+            elif n and n == fo.min and d == -1:
+                return fo.min
+            else:
+                return n//d
+
         with np.errstate(divide='ignore'):
             ac = a.copy()
             ac //= b
@@ -562,9 +573,9 @@ class TestDivision:
         fo = np.iinfo(dtype)
         a = eval(ex_val)
         lst = a.tolist()
-        c_div = lambda n, d: (
-            0 if d == 0 or (n and n == fo.min and d == -1) else n//d
-        )
+
+        def c_div(n, d):
+            return 0 if d == 0 or n and n == fo.min and d == -1 else n // d
 
         with np.errstate(divide='ignore'):
             div_a = np.floor_divide.reduce(a)
@@ -2936,7 +2947,10 @@ class TestMinMax:
                 for i in range(inp.size):
                     inp[:] = np.arange(inp.size, dtype=dt)
                     inp[i] = np.nan
-                    emsg = lambda: '%r\n%s' % (inp, msg)
+
+                    def emsg():
+                        return '%r\n%s' % (inp, msg)
+
                     with suppress_warnings() as sup:
                         sup.filter(RuntimeWarning,
                                    "invalid value encountered in reduce")

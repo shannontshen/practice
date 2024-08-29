@@ -1243,7 +1243,8 @@ class TestTypes:
     @pytest.mark.parametrize("string_dtype", ["U", "S"])
     def test_promote_types_strings(self, swap, string_dtype):
         if swap == "swap":
-            promote_types = lambda a, b: np.promote_types(b, a)
+            def promote_types(a, b):
+                return np.promote_types(b, a)
         else:
             promote_types = np.promote_types
 
@@ -3256,7 +3257,10 @@ class TestCreationFuncs:
         dtypes = {np.dtype(tp) for tp in itertools.chain(*sctypes.values())}
         # void, bytes, str
         variable_sized = {tp for tp in dtypes if tp.str.endswith('0')}
-        keyfunc = lambda dtype: dtype.str
+
+        def keyfunc(dtype):
+            return dtype.str
+
         self.dtypes = sorted(dtypes - variable_sized |
                              {np.dtype(tp.str.replace("0", str(i)))
                               for tp in variable_sized for i in range(1, 10)},

@@ -185,7 +185,8 @@ class _SIMD_BOOL(_Test_Utility):
         assert data_xnor == vxnor
 
     def test_tobits(self):
-        data2bits = lambda data: sum([int(x != 0) << i for i, x in enumerate(data, 0)])
+        def data2bits(data):
+            return sum([int(x != 0) << i for i, x in enumerate(data, 0)])
         for data in (self._data(), self._data(reverse=True)):
             vdata = self._load_b(data)
             data_bits = data2bits(data)
@@ -336,7 +337,8 @@ class _SIMD_FP32(_Test_Utility):
         if not self.npyv.simd_f64 and re.match(r".*(NEON|ASIMD)", features):
             # very costly to emulate nearest even on Armv7
             # instead we round halves to up. e.g. 0.5 -> 1, -0.5 -> -1
-            _round = lambda v: int(v + (0.5 if v >= 0 else -0.5))
+            def _round(v):
+                return int(v + (0.5 if v >= 0 else -0.5))
         else:
             _round = round
         vdata_a = self.load(self._data())
@@ -531,13 +533,11 @@ class _SIMD_FP(_Test_Utility):
         if not chk_nan:
             return
         if chk_nan == 1:
-            test_nan = lambda a, b: (
-                b if math.isnan(a) else a if math.isnan(b) else b
-            )
+            def test_nan(a, b):
+                return b if math.isnan(a) else a if math.isnan(b) else b
         else:
-            test_nan = lambda a, b: (
-                nan if math.isnan(a) or math.isnan(b) else b
-            )
+            def test_nan(a, b):
+                return nan if math.isnan(a) or math.isnan(b) else b
         cases = (
             (nan, 10),
             (10, nan),

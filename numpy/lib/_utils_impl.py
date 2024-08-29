@@ -377,7 +377,10 @@ def _info(obj, output=None):
     """
     extra = ""
     tic = ""
-    bp = lambda x: x
+
+    def bp(x):
+        return x
+
     cls = getattr(obj, '__class__', type(obj))
     nm = getattr(cls, '__name__', cls)
     strides = obj.strides

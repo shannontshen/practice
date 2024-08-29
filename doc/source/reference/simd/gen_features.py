@@ -92,9 +92,11 @@ class Features:
                   **kwargs):
 
         if fstyle is None:
-            fstyle = lambda ft: f'``{ft}``'
+            def fstyle(ft):
+                return f'``{ft}``'
         if fstyle_implies is None:
-            fstyle_implies = lambda origin, ft: fstyle(ft)
+            def fstyle_implies(origin, ft):
+                return fstyle(ft)
 
         rows = []
         have_gather = False

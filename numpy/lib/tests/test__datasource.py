@@ -229,7 +229,8 @@ class TestDataSourceAbspath:
         tmpfile = valid_textfile(self.tmpdir)
         tmpfilename = os.path.split(tmpfile)[-1]
 
-        tmp_path = lambda x: os.path.abspath(self.ds.abspath(x))
+        def tmp_path(x):
+            return os.path.abspath(self.ds.abspath(x))
 
         assert_(tmp_path(valid_httpurl()).startswith(self.tmpdir))
         assert_(tmp_path(invalid_httpurl()).startswith(self.tmpdir))
@@ -269,7 +270,8 @@ class TestRepositoryAbspath:
         assert_equal(local_path, filepath)
 
     def test_sandboxing(self):
-        tmp_path = lambda x: os.path.abspath(self.repos.abspath(x))
+        def tmp_path(x):
+            return os.path.abspath(self.repos.abspath(x))
         assert_(tmp_path(valid_httpfile()).startswith(self.tmpdir))
         for fn in malicious_files:
             assert_(tmp_path(http_path+fn).startswith(self.tmpdir))
