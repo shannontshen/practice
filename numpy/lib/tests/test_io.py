@@ -70,7 +70,7 @@ def strptime(s, fmt=None):
     2.5.
 
     """
-    if type(s) == bytes:
+    if type(s) is bytes:
         s = s.decode("latin1")
     return datetime(*time.strptime(s, fmt)[:3])
 
@@ -2474,9 +2474,9 @@ M   33  21.99
 
         assert_equal(test.dtype.names, ['f0', 'f1', 'f2'])
 
-        assert_(test.dtype['f0'] == float)
-        assert_(test.dtype['f1'] == np.int64)
-        assert_(test.dtype['f2'] == np.int_)
+        assert_(test.dtype['f0'] == float)  # noqa: E721
+        assert_(test.dtype['f1'] == np.int64)  # noqa: E721
+        assert_(test.dtype['f2'] == np.int_)  # noqa: E721
 
         assert_allclose(test['f0'], 73786976294838206464.)
         assert_equal(test['f1'], 17179869184)

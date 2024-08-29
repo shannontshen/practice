@@ -1055,7 +1055,7 @@ class TestMatrixPower:
 
         for mat in self.rshft_all:
             tz(mat.astype(dt))
-            if dt != object:
+            if dt != object:  # noqa: E721
                 tz(self.stacked.astype(dt))
 
     def test_power_is_one(self, dt):
@@ -1066,7 +1066,7 @@ class TestMatrixPower:
 
         for mat in self.rshft_all:
             tz(mat.astype(dt))
-            if dt != object:
+            if dt != object:  # noqa: E721
                 tz(self.stacked.astype(dt))
 
     def test_power_is_two(self, dt):
@@ -1078,7 +1078,7 @@ class TestMatrixPower:
 
         for mat in self.rshft_all:
             tz(mat.astype(dt))
-            if dt != object:
+            if dt != object:  # noqa: E721
                 tz(self.stacked.astype(dt))
 
     def test_power_is_minus_one(self, dt):

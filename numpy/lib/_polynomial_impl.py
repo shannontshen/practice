@@ -135,7 +135,7 @@ def poly(seq_of_zeros):
     elif len(sh) == 1:
         dt = seq_of_zeros.dtype
         # Let object arrays slip through, e.g. for arbitrary precision
-        if dt != object:
+        if dt is not object:
             seq_of_zeros = seq_of_zeros.astype(mintypecode(dt.char))
     else:
         raise ValueError("input must be 1d or non-empty square 2d array.")
