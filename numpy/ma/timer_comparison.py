@@ -135,8 +135,8 @@ class ModuleTester:
 
         assert (xm-ym).filled(0).any()
         s = x.shape
-        assert xm.size == reduce(lambda x, y:x*y, s)
-        assert self.count(xm) == len(m1) - reduce(lambda x, y:x+y, m1)
+        assert xm.size == reduce(lambda x, y: x*y, s)
+        assert self.count(xm) == len(m1) - reduce(lambda x, y: x+y, m1)
 
         for s in [(4, 3), (6, 2)]:
             x.shape = s
@@ -144,7 +144,7 @@ class ModuleTester:
             xm.shape = s
             ym.shape = s
             xf.shape = s
-            assert self.count(xm) == len(m1) - reduce(lambda x, y:x+y, m1)
+            assert self.count(xm) == len(m1) - reduce(lambda x, y: x+y, m1)
 
     @np.errstate(all='ignore')
     def test_2(self):
