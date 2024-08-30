@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # System imports
-from   math           import sqrt
 import sys
 import unittest
+from math           import sqrt
 
 # Import NumPy
 import numpy as np
