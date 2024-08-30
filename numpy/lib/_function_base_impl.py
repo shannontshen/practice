@@ -221,7 +221,7 @@ def rot90(m, k=1, axes=(0, 1)):
         raise ValueError("Axes must be different.")
 
     if (axes[0] >= m.ndim or axes[0] < -m.ndim
-        or axes[1] >= m.ndim or axes[1] < -m.ndim):
+            or axes[1] >= m.ndim or axes[1] < -m.ndim):
         raise ValueError("Axes={} out of range for array of ndim={}."
             .format(axes, m.ndim))
 
