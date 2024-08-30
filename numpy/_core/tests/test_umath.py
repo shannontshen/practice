@@ -2810,8 +2810,8 @@ class TestBitwiseUFuncs:
             num = 2**i - 1
             msg = f"bitwise_count for {num}"
             assert i == np.bitwise_count(input_dtype(num)), msg
-            if np.issubdtype(
-                input_dtype, np.signedinteger) or input_dtype == np.object_:
+            if (np.issubdtype(input_dtype, np.signedinteger)
+                    or input_dtype == np.object_):
                 assert i == np.bitwise_count(input_dtype(-num)), msg
 
         a = np.array([2**i-1 for i in range(1, bitsize)], dtype=input_dtype)

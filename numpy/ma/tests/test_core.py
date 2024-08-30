@@ -4201,7 +4201,7 @@ class TestMaskedArrayMathMethods:
         with pytest.raises(
             ValueError,
             match="diff requires input that is at least one dimensional"
-            ):
+        ):
             np.ma.diff(np.array(1))
 
     def test_diff_with_n_0(self):

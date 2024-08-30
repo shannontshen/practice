@@ -968,7 +968,8 @@ class ABCPolyBase(abc.ABC):
 
     @classmethod
     def fit(cls, x, y, deg, domain=None, rcond=None, full=False, w=None,
-        window=None, symbol='x'):
+            window=None, symbol='x'
+            ):
         """Least squares fit to data.
 
         Return a series instance that is the least squares fit to the data
