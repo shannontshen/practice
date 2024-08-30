@@ -643,8 +643,11 @@ class TestAssignment:
         b = np.array([b'done'])
 
         class bad_sequence:
-            def __getitem__(self): pass
-            def __len__(self): raise RuntimeError
+            def __getitem__(self):
+                pass
+
+            def __len__(self):
+                raise RuntimeError
 
         assert_raises(ValueError, operator.setitem, u, 0, [])
         assert_raises(ValueError, operator.setitem, b, 0, [])
