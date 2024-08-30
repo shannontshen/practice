@@ -466,7 +466,6 @@ class TestArrayFunctionImplementation:
             func(*objs)
 
 
-
 class TestNDArrayMethods:
 
     def test_repr(self):

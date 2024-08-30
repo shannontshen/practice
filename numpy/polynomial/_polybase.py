@@ -505,8 +505,6 @@ class ABCPolyBase(abc.ABC):
 
         return rf"${self.symbol} \mapsto {body}$"
 
-
-
     # Pickle and copy
 
     def __getstate__(self):

@@ -2447,7 +2447,6 @@ class TestRegression:
             def __len__(self):
                 return 0
 
-
         t = T()
         # gh-13659, would raise in broadcasting [x=t for x in result]
         arr = np.array([t])
