@@ -26,6 +26,7 @@ def compiler_check_f2pycli():
     else:
         f2pycli()
 
+
 #########################
 # CLI utils and classes #
 #########################
