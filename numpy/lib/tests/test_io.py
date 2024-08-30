@@ -1237,7 +1237,7 @@ class TestLoadTxt(LoadTxtBase):
         assert_array_equal(x, a)
 
     def test_max_rows_larger(self):
-        #test max_rows > num rows
+        # test max_rows > num rows
         c = TextIO()
         c.write('comment\n1,2,3,5\n4,5,7,8\n2,1,4,5')
         c.seek(0)
@@ -1337,7 +1337,7 @@ class Testfromregex:
             np.fromregex(c, regexp, dtype=np.float64)
 
 
-#####--------------------------------------------------------------------------
+# --------------------------------------------------------------------------
 
 
 class TestFromTxt(LoadTxtBase):
@@ -2359,7 +2359,7 @@ M   33  21.99
         assert_(isinstance(test, np.recarray))
         assert_equal(test, control)
 
-        #gh-10394
+        # gh-10394
         data = TextIO('color\n"red"\n"blue"')
         test = recfromcsv(data, converters={0: lambda x: x.strip('\"')})
         control = np.array([('red',), ('blue',)], dtype=[('color', (str, 4))])

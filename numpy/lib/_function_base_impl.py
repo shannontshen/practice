@@ -2384,8 +2384,8 @@ class vectorize:
                  excluded=None, cache=False, signature=None):
 
         if (pyfunc != np._NoValue) and (not callable(pyfunc)):
-            #Splitting the error message to keep
-            #the length below 79 characters.
+            # Splitting the error message to keep
+            # the length below 79 characters.
             part1 = "When used as a decorator, "
             part2 = "only accepts keyword arguments."
             raise TypeError(part1 + part2)
@@ -5549,10 +5549,10 @@ def insert(arr, obj, values, axis=None):
                 "integer", FutureWarning, stacklevel=2)
             indices = indices.astype(intp)
             # Code after warning period:
-            #if obj.ndim != 1:
+            # if obj.ndim != 1:
             #    raise ValueError('boolean array argument obj to insert '
             #                     'must be one dimensional')
-            #indices = np.flatnonzero(obj)
+            # indices = np.flatnonzero(obj)
         elif indices.ndim > 1:
             raise ValueError(
                 "index array argument obj to insert must be one dimensional "

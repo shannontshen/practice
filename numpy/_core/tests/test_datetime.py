@@ -700,8 +700,8 @@ class TestDateTime:
         a = np.array(['today', datetime.date.today()], dtype='M8[D]')
         assert_equal(a[0], a[1])
         # datetime.datetime.now() returns local time, not UTC
-        #a = np.array(['now', datetime.datetime.now()], dtype='M8[s]')
-        #assert_equal(a[0], a[1])
+        # a = np.array(['now', datetime.datetime.now()], dtype='M8[s]')
+        # assert_equal(a[0], a[1])
 
         # we can give a datetime.date time units
         assert_equal(np.array(datetime.date(1960, 3, 12), dtype='M8[s]'),
@@ -1566,10 +1566,10 @@ class TestDateTime:
         #       default in ufuncs strikes again... :(
         a = np.array(3, dtype='m8[h]')
         b = np.array('1999-03-12T12', dtype='M8[s]')
-        #assert_raises(TypeError, np.minimum, a, b)
-        #assert_raises(TypeError, np.maximum, a, b)
-        #assert_raises(TypeError, np.fmin, a, b)
-        #assert_raises(TypeError, np.fmax, a, b)
+        # assert_raises(TypeError, np.minimum, a, b)
+        # assert_raises(TypeError, np.maximum, a, b)
+        # assert_raises(TypeError, np.fmin, a, b)
+        # assert_raises(TypeError, np.fmax, a, b)
         assert_raises(TypeError, np.minimum, a, b, casting='same_kind')
         assert_raises(TypeError, np.maximum, a, b, casting='same_kind')
         assert_raises(TypeError, np.fmin, a, b, casting='same_kind')

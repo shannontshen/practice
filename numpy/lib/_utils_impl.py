@@ -303,7 +303,7 @@ def deprecate_with_doc(msg):
     return _Deprecate(message=msg)
 
 
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 
 # NOTE:  pydoc defines a help function which works similarly to this

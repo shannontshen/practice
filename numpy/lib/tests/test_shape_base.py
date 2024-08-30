@@ -38,7 +38,7 @@ class TestTakeAlongAxis:
             (np.sort, np.argsort, dict()),
             (_add_keepdims(np.min), _add_keepdims(np.argmin), dict()),
             (_add_keepdims(np.max), _add_keepdims(np.argmax), dict()),
-            #(np.partition, np.argpartition, dict(kth=2)),
+            # (np.partition, np.argpartition, dict(kth=2)),
         ]
 
         for func, argfunc, kwargs in funcs:
@@ -259,7 +259,7 @@ class TestApplyAlongAxis:
     def test_empty(self):
         # can't apply_along_axis when there's no chance to call the function
         def never_call(x):
-            assert_(False) # should never be reached
+            assert_(False)  # should never be reached
 
         a = np.empty((0, 0))
         assert_raises(ValueError, np.apply_along_axis, never_call, 0, a)

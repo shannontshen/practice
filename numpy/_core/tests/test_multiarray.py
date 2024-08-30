@@ -1133,7 +1133,7 @@ class TestCreation:
             def __len__(self):
                 return 42
 
-        a = np.array(C()) # segfault?
+        a = np.array(C())  # segfault?
         assert_equal(len(a), 0)
 
     def test_false_len_iterable(self):
@@ -1555,7 +1555,7 @@ class TestStructured:
         def testassign(arr, v):
             c = arr.copy()
             c[0] = v  # assign using setitem
-            c[1:] = v # assign using "dtype_transfer" code paths
+            c[1:] = v  # assign using "dtype_transfer" code paths
             return c
 
         dt = np.dtype([('foo', 'i8'), ('bar', 'i8')])
@@ -2289,11 +2289,11 @@ class TestMethods:
             arr[::-1].sort()
 
     def test_sort_raises(self):
-        #gh-9404
+        # gh-9404
         arr = np.array([0, datetime.now(), 1], dtype=object)
         for kind in self.sort_kinds:
             assert_raises(TypeError, arr.sort, kind=kind)
-        #gh-3879
+        # gh-3879
         class Raiser:
             def raises_anything(*args, **kwargs):
                 raise TypeError("SOMETHING ERRORED")
@@ -5374,7 +5374,7 @@ class TestLexsort:
             u, v = np.array(u, dtype='object'), np.array(v, dtype='object')
             assert_array_equal(idx, np.lexsort((u, v)))
 
-    def test_invalid_axis(self): # gh-7528
+    def test_invalid_axis(self):  # gh-7528
         x = np.linspace(0., 1., 42*3).reshape(42, 3)
         assert_raises(AxisError, np.lexsort, x, axis=2)
 
@@ -5761,7 +5761,7 @@ class TestIO:
             x.tofile(f, sep=',')
         with open(tmp_filename, 'r') as f:
             s = f.read()
-        #assert_equal(s, '1.51,2.0,3.51,4.0')
+        # assert_equal(s, '1.51,2.0,3.51,4.0')
         y = np.array([float(p) for p in s.split(',')])
         assert_array_equal(x,y)
 

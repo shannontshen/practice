@@ -424,10 +424,10 @@ class TestRegression:
     def test_lexsort_zerolen_custom_strides(self):
         # Ticket #14228
         xs = np.array([], dtype='i8')
-        assert np.lexsort((xs,)).shape[0] == 0 # Works
+        assert np.lexsort((xs,)).shape[0] == 0  # Works
 
         xs.strides = (16,)
-        assert np.lexsort((xs,)).shape[0] == 0 # Was: MemoryError
+        assert np.lexsort((xs,)).shape[0] == 0  # Was: MemoryError
 
     def test_lexsort_zerolen_custom_strides_2d(self):
         xs = np.array([], dtype='i8')
@@ -1242,18 +1242,18 @@ class TestRegression:
         assert_(arr[0][1] == 4)
 
     def test_void_scalar_constructor(self):
-        #Issue #1550
+        # Issue #1550
 
-        #Create test string data, construct void scalar from data and assert
-        #that void scalar contains original data.
+        # Create test string data, construct void scalar from data and assert
+        # that void scalar contains original data.
         test_string = np.array("test")
         test_string_void_scalar = np._core.multiarray.scalar(
             np.dtype(("V", test_string.dtype.itemsize)), test_string.tobytes())
 
         assert_(test_string_void_scalar.view(test_string.dtype) == test_string)
 
-        #Create record scalar, construct from data and assert that
-        #reconstructed scalar is correct.
+        # Create record scalar, construct from data and assert that
+        # reconstructed scalar is correct.
         test_record = np.ones((), "i,i")
         test_record_void_scalar = np._core.multiarray.scalar(
             test_record.dtype, test_record.tobytes())
@@ -2455,7 +2455,7 @@ class TestRegression:
 
     @pytest.mark.skipif(sys.maxsize < 2 ** 31 + 1, reason='overflows 32-bit python')
     def test_to_ctypes(self):
-        #gh-14214
+        # gh-14214
         arr = np.zeros((2 ** 31 + 1,), 'b')
         assert arr.size * arr.itemsize > 2 ** 31
         c_arr = np.ctypeslib.as_ctypes(arr)

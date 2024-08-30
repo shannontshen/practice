@@ -377,8 +377,8 @@ class TestModulus:
                 rem = operator.mod(fone, fzer)
                 assert_(np.isnan(rem), 'dt: %s' % dt)
                 # MSVC 2008 returns NaN here, so disable the check.
-                #rem = operator.mod(fone, finf)
-                #assert_(rem == fone, 'dt: %s' % dt)
+                # rem = operator.mod(fone, finf)
+                # assert_(rem == fone, 'dt: %s' % dt)
                 rem = operator.mod(fone, fnan)
                 assert_(np.isnan(rem), 'dt: %s' % dt)
                 rem = operator.mod(finf, fone)
@@ -554,13 +554,13 @@ class TestConversion:
                 assert_(not np.array(1, dtype=dt1)[()] < np.array(0, dtype=dt2)[()],
                         "type %s and %s failed" % (dt1, dt2))
 
-        #Unsigned integers
+        # Unsigned integers
         for dt1 in 'BHILQP':
             assert_(-1 < np.array(1, dtype=dt1)[()], "type %s failed" % (dt1,))
             assert_(not -1 > np.array(1, dtype=dt1)[()], "type %s failed" % (dt1,))
             assert_(-1 != np.array(1, dtype=dt1)[()], "type %s failed" % (dt1,))
 
-            #unsigned vs signed
+            # unsigned vs signed
             for dt2 in 'bhilqp':
                 assert_(np.array(1, dtype=dt1)[()] > np.array(-1, dtype=dt2)[()],
                         "type %s and %s failed" % (dt1, dt2))
@@ -569,7 +569,7 @@ class TestConversion:
                 assert_(np.array(1, dtype=dt1)[()] != np.array(-1, dtype=dt2)[()],
                         "type %s and %s failed" % (dt1, dt2))
 
-        #Signed integers and floats
+        # Signed integers and floats
         for dt1 in 'bhlqp' + np.typecodes['Float']:
             assert_(1 > np.array(-1, dtype=dt1)[()], "type %s failed" % (dt1,))
             assert_(not 1 < np.array(-1, dtype=dt1)[()], "type %s failed" % (dt1,))
@@ -605,7 +605,7 @@ class TestConversion:
         assert_(np.equal(np.datetime64('NaT'), None))
 
 
-#class TestRepr:
+# class TestRepr:
 #    def test_repr(self):
 #        for t in types:
 #            val = t(1197346475.0137341)
