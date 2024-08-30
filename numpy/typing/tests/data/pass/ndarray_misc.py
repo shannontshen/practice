@@ -14,7 +14,8 @@ from typing import cast, Any
 import numpy as np
 import numpy.typing as npt
 
-class SubClass(npt.NDArray[np.float64]): ...
+class SubClass(npt.NDArray[np.float64]):
+    ...
 
 
 i4 = np.int32(1)
